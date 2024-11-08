@@ -1,0 +1,32 @@
+---
+title: "TIME SERIES ANALYSIS"
+author: "Victor Anton, Imholz Chris"
+date: "19.12.2024"
+output:
+  html_document: default
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
+  markdown:
+    wrap: 72
+---
+
+
+```{r libraries, warning=FALSE, message=FALSE}
+
+# Load libraries
+
+```
+
+```{r titles_of_code, echo = TRUE, fig.width=10}
+
+CODE
+```
+
+```{r titles_of_code, echo = TRUE, fig.width=10}
+
+CODE
+
+```
+
+## GenAI Usage
