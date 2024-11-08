@@ -27,7 +27,7 @@ TBD:
 
 ## Collaboration
 To ensure a smooth collaboration, please follow these guidelines when making contributions:
-1. **Code Style and Standards**: Maintain a consistent code style by following our coding conventions. Use clear and descriptive names for variables, functions, and classes. Please follow the [PEP8](https://peps.python.org/pep-0008/) (Python Enhancement Proposals) conventions.
+1. **Code Style and Standards**: Maintain a consistent code style by following our coding conventions. Use clear and descriptive names for variables, functions, and classes.
 2. **Commit Message Guidelines**: Write informative and concise commit messages. Start with a short summary in the present tense, followed by a more detailed description if necessary. This helps to maintain a clean and organized commit history.
 3. **Documentation**: Update relevant documentation to reflect your changes. This includes code comments, README files, or any other supporting documentation. Provide clear instructions on how to use new features or any changes to existing functionality.
 4. **Code of Conduct**: We expect all contributors to adhere to our project's code of conduct. Be respectful and considerate in all interactions within the project community. Harassment or any form of offensive behavior will not be tolerated.
