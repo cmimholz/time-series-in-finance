@@ -11,8 +11,13 @@ editor_options:
     wrap: 72
 ---
 
+CHECK EXAMPLES
+
+
+
 Structure
-## 1. Identification phase: Identification of the appropriate model (descriptive analysis!)0
+## 1. Identification phase: Identification of the appropriate model (descriptive analysis!)
+
 
 ### Descriptive analysis
 Objective: Understand how the time series in question are characterized. Results are used as a basis for adequately modelling the subject in question and hence as a basis for inference analysis and forecasting.
@@ -34,18 +39,108 @@ Objective: Understand how the time series in question are characterized. Results
 ```{r libraries, warning=FALSE, message=FALSE}
 
 # Load libraries
-
+library(tidyquant)
+library(quantmod)
+library(ggplot2)
 ```
 
 ```{r titles_of_code, echo = TRUE, fig.width=10}
 
-CODE
-```
 
-```{r titles_of_code, echo = TRUE, fig.width=10}
 
-CODE
 
 ```
+
+## Bedeutungen der Spaltenüberschriften
+
+Die folgenden Spaltenüberschriften erscheinen in den heruntergeladenen Daten. `[SYMBOL]` steht für das jeweilige Börsensymbol der Aktie.
+
+| **Spalte**         | **Bedeutung**                                                                                 |
+|---------------------|-----------------------------------------------------------------------------------------------|
+| `[SYMBOL].Open`    | Eröffnungskurs der Aktie (Price at the market open) an einem bestimmten Handelstag.           |
+| `[SYMBOL].High`    | Höchster Kurs der Aktie während des Handelstages (Highest intraday price).                    |
+| `[SYMBOL].Low`     | Niedrigster Kurs der Aktie während des Handelstages (Lowest intraday price).                  |
+| `[SYMBOL].Close`   | Schlusskurs der Aktie am Ende des Handelstages (Price at the market close).                   |
+| `[SYMBOL].Volume`  | Anzahl der gehandelten Aktien während des Handelstages (Trading volume).                      |
+| `[SYMBOL].Adjusted`| Angepasster Schlusskurs der Aktie, der Dividenden, Splits und andere Anpassungen berücksichtigt (Adjusted close). |
+
+
+```{r share_download, echo = TRUE, fig.width=10}
+
+
+smi_symbols <- c(
+  "ABBN.SW", "ADEN.SW", "ALC.SW", "CFR.SW", "GEBN.SW", "GIVN.SW",
+  "HOLN.SW", "BAER.SW", "KNIN.SW", "LOGN.SW", "LONN.SW", "NESN.SW",
+  "NOVN.SW", "PGHN.SW", "ROG.SW", "SIKA.SW", "SOON.SW", "SLHN.SW",
+  "SREN.SW", "SCMN.SW", "UHR.SW", "UBSG.SW", "ZURN.SW"
+)
+
+
+# Abrufen der aktuellen S&P 500-Unternehmen
+ sp500 <- tq_index("SP500")
+ head(sp500)
+
+# Function to download data for each stock
+download_data <- function(symbols, start_date = "2022-01-01", end_date = Sys.Date()) {
+  stock_data <- list()
+  for (symbol in symbols) {
+    tryCatch({
+      stock_data[[symbol]] <- getSymbols(symbol, src = "yahoo", 
+                                         from = start_date, 
+                                         to = end_date, 
+                                         auto.assign = FALSE)
+      cat("Downloaded data for:", symbol, "\n")
+    }, error = function(e) {
+      cat("Error downloading data for:", symbol, "\n")
+    })
+  }
+  return(stock_data)
+}
+
+# Download data
+smi_data <- download_data(smi_symbols)
+s_p_data <- download_data(sp500$symbol)
+
+# Save the data to RDS for future use
+saveRDS(smi_data, file = "smi_stock_data.rds")
+saveRDS(s_p_data, file = "s_p_stock_data.rds")
+
+# Example: Accessing data for a specific stock (e.g., Nestlé)
+head(smi_data[["NESN.SW"]],10)
+```
+
+smi_data
+
+```{r chart visual, echo = TRUE, fig.width=10}
+
+#function visualises char
+plot_stock <- function(stock_data, symbol) {
+  if (!is.null(stock_data[[symbol]])) {
+    stock <- stock_data[[symbol]]
+    # Ensure the adjusted price column is available
+    column_name <- paste0(symbol, ".Adjusted")
+    if (column_name %in% colnames(stock)) {
+      plot(stock[, column_name], 
+           main = paste("Stock Prices for", symbol), 
+           xlab = "Date", 
+           ylab = "Adjusted Price", 
+           col = "blue", 
+           type = "l")
+    } else {
+      cat("Adjusted price data not available for:", symbol, "\n")
+    }
+  } else {
+    cat("No data available for:", symbol, "\n")
+  }
+}
+
+
+# Example: Plot Nestlé stock data
+plot_stock(smi_data, "NESN.SW")
+
+# Example: Plot NVIDIA stock data
+plot_stock(s_p_data, "AAPL")
+```
+
 
 ## GenAI Usage
