@@ -142,5 +142,42 @@ plot_stock(smi_data, "NESN.SW")
 plot_stock(s_p_data, "AAPL")
 ```
 
+```{r chart visual, echo = TRUE, fig.width=10}
+# Funktion zur Berechnung der % Differenz für eine Aktie
+calc_percent_diff <- function(stock_data, symbol) {
+  if (!is.null(stock_data[[symbol]])) {
+    # Zugriff auf die Schlusskursspalte
+    close_col <- paste0(symbol, ".Adjusted")
+    if (close_col %in% colnames(stock_data[[symbol]])) {
+      # Berechnung der prozentualen Differenz
+      close_prices <- stock_data[[symbol]][, close_col]
+      percent_diff <- (close_prices / lag(close_prices) - 1) * 100
+      
+      # Spalte mit Differenzen hinzufügen
+      stock_data[[symbol]]$Percent_Diff <- percent_diff
+      return(stock_data[[symbol]])
+    } else {
+      cat("Close column not found for:", symbol, "\n")
+      return(NULL)
+    }
+  } else {
+    cat("No data available for:", symbol, "\n")
+    return(NULL)
+  }
+}
+
+# Anwendung der Funktion auf alle Aktien
+calc_all_percent_diff <- function(stock_data, symbols) {
+  lapply(symbols, function(symbol) {
+    calc_percent_diff(stock_data, symbol)
+  })
+}
+
+# Beispiel: Berechnung der % Differenz für SMI
+smi_percent_diff <- calc_all_percent_diff(smi_data, smi_symbols)
+
+# Beispiel: Zugriff auf die berechnete Differenz für UBSG.SW
+head(smi_percent_diff[["UBSG.SW"]])
+```
 
 ## GenAI Usage
