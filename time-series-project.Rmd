@@ -81,7 +81,7 @@ smi_symbols <- c(
  head(sp500)
 
 # Function to download data for each stock
-download_data <- function(symbols, start_date = "2022-01-01", end_date = Sys.Date()) {
+download_data <- function(symbols, start_date = "2022-01-01",end_date = Sys.Date()) {
   stock_data <- list()
   for (symbol in symbols) {
     tryCatch({
@@ -99,7 +99,7 @@ download_data <- function(symbols, start_date = "2022-01-01", end_date = Sys.Dat
 
 # Download data
 smi_data <- download_data(smi_symbols)
-s_p_data <- download_data(sp500$symbol)
+#s_p_data <- download_data(sp500$symbol)
 
 # Save the data to RDS for future use
 saveRDS(smi_data, file = "smi_stock_data.rds")
@@ -139,10 +139,11 @@ plot_stock <- function(stock_data, symbol) {
 plot_stock(smi_data, "NESN.SW")
 
 # Example: Plot NVIDIA stock data
-plot_stock(s_p_data, "AAPL")
+# plot_stock(s_p_data, "AAPL")
 ```
 
-```{r chart visual, echo = TRUE, fig.width=10}
+```{r chart Change , echo = TRUE, fig.width=10}
+# Funktion zur Berechnung der % Differenz für eine Aktie
 # Funktion zur Berechnung der % Differenz für eine Aktie
 calc_percent_diff <- function(stock_data, symbol) {
   if (!is.null(stock_data[[symbol]])) {
@@ -153,8 +154,19 @@ calc_percent_diff <- function(stock_data, symbol) {
       close_prices <- stock_data[[symbol]][, close_col]
       percent_diff <- (close_prices / lag(close_prices) - 1) * 100
       
+      # Neuer Spaltenname mit Symbol und ".Percent_Diff"
+      percent_diff_col <- paste0(symbol, ".Percent_Diff")
+      
+      # Sicherstellen, dass der Datensatz als Dataframe behandelt wird
+      stock_data[[symbol]] <- as.data.frame(stock_data[[symbol]])
+      
+      
+      
       # Spalte mit Differenzen hinzufügen
-      stock_data[[symbol]]$Percent_Diff <- percent_diff
+      stock_data[[symbol]][, percent_diff_col] <- percent_diff
+      
+      
+      
       return(stock_data[[symbol]])
     } else {
       cat("Close column not found for:", symbol, "\n")
@@ -166,11 +178,13 @@ calc_percent_diff <- function(stock_data, symbol) {
   }
 }
 
-# Anwendung der Funktion auf alle Aktien
+# Apply the function to all stocks while maintaining structure
 calc_all_percent_diff <- function(stock_data, symbols) {
-  lapply(symbols, function(symbol) {
-    calc_percent_diff(stock_data, symbol)
-  })
+  modified_stock_data <- stock_data  # Copy the original list structure
+  for (symbol in symbols) {
+    modified_stock_data[[symbol]] <- calc_percent_diff(stock_data, symbol)
+  }
+  return(modified_stock_data)
 }
 
 # Beispiel: Berechnung der % Differenz für SMI
@@ -178,6 +192,14 @@ smi_percent_diff <- calc_all_percent_diff(smi_data, smi_symbols)
 
 # Beispiel: Zugriff auf die berechnete Differenz für UBSG.SW
 head(smi_percent_diff[["UBSG.SW"]])
+
+smi_percent_diff
+
+```
+
+```{r chart visual, echo = TRUE, fig.width=10}
+
+
 ```
 
 ## GenAI Usage
