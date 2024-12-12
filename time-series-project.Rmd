@@ -42,6 +42,7 @@ Objective: Understand how the time series in question are characterized. Results
 library(tidyquant)
 library(quantmod)
 library(ggplot2)
+library(dplyr)
 ```
 
 ```{r titles_of_code, echo = TRUE, fig.width=10}
@@ -103,7 +104,7 @@ smi_data <- download_data(smi_symbols)
 
 # Save the data to RDS for future use
 saveRDS(smi_data, file = "smi_stock_data.rds")
-saveRDS(s_p_data, file = "s_p_stock_data.rds")
+#saveRDS(s_p_data, file = "s_p_stock_data.rds")
 
 # Example: Accessing data for a specific stock (e.g., Nestlé)
 head(smi_data[["NESN.SW"]],10)
@@ -143,7 +144,6 @@ plot_stock(smi_data, "NESN.SW")
 ```
 
 ```{r chart Change , echo = TRUE, fig.width=10}
-# Funktion zur Berechnung der % Differenz für eine Aktie
 # Funktion zur Berechnung der % Differenz für eine Aktie
 calc_percent_diff <- function(stock_data, symbol) {
   if (!is.null(stock_data[[symbol]])) {
@@ -197,9 +197,123 @@ smi_percent_diff
 
 ```
 
-```{r chart visual, echo = TRUE, fig.width=10}
+Die Strategie erfordert:
+
+1. Identifikation von Ereignissen mit ≥ 5 % Kursänderung.
+2. Kauf der Aktie 3 Tage nach dem Ereignis.
+3. Halten der Aktie für 30 Tage.
+4. Berechnung der Renditen.
 
 
+```{r strategy_identify, echo = TRUE, fig.width=10}
+#1. Identifikation von Ereignissen mit ≥ 5 % Kursänderung.
+identify_events <- function(stock_data, symbol, threshold) {
+  if (!is.null(stock_data[[symbol]])) {
+    percent_diff_col <- paste0(symbol, ".Percent_Diff")
+    if (percent_diff_col %in% colnames(stock_data[[symbol]])) {
+      stock_data[[symbol]] <- as.data.frame(stock_data[[symbol]])
+      stock_data[[symbol]]$Event <- stock_data[[symbol]][, percent_diff_col] < threshold
+      return(stock_data[[symbol]])
+    } else {
+      cat("Percent diff column not found for:", symbol, "\n")
+      return(NULL)
+    }
+  } else {
+    cat("No data available for:", symbol, "\n")
+    return(NULL)
+  }
+}
+
+# Initialisiere eine leere Liste, um Ergebnisse zu speichern
+smi_with_events <- list()
+
+# For-Loop, um Ereignisse zu identifizieren
+for (i in seq_along(smi_percent_diff)) {
+  symbol <- smi_symbols[i]  # Das aktuelle Symbol
+  smi_with_events[[symbol]] <- identify_events(stock_data = smi_percent_diff, 
+                                               symbol = symbol, 
+                                               threshold = -5.0)
+}
+
+smi_with_events
+
+
+
+```
+
+
+2. Kauf der Aktie 3 Tage nach dem Ereignis.
+```{r strategy_identify, echo = TRUE, fig.width=10}
+#2. Kauf der Aktie 3 Tage nach dem Ereignis.
+
+# Funktion zum Hinzufügen des Kaufdatums
+add_buy_dates <- function(stock_data, symbol) {
+  if (!is.null(stock_data[[symbol]])) {
+    stock_data[[symbol]] <- as.data.frame(stock_data[[symbol]])
+    # Hinzufügen der Spalte "Buy_Date", 3 Tage nach einem Ereignis
+    stock_data[[symbol]]$Buy_Date <- ifelse(
+      stock_data[[symbol]]$Event,  # Wenn ein Ereignis identifiziert wurde
+      index(stock_data[[symbol]]) + 3,  # Kaufdatum = Ereignisdatum + 3 Tage
+      NA  # Sonst NA
+    )
+    return(stock_data[[symbol]])
+  } else {
+    cat("No data available for:", symbol, "\n")
+    return(NULL)
+  }
+}
+
+# For-Loop, um Kaufdaten hinzuzufügen
+smi_with_buy_dates <- list()
+
+for (i in seq_along(smi_with_events)) {
+  symbol <- smi_symbols[i]  # Das aktuelle Symbol
+  smi_with_buy_dates[[symbol]] <- add_buy_dates(stock_data = smi_with_events, symbol = symbol)
+}
+
+
+smi_with_buy_dates
+```
+
+```{r strategy_identify, echo = TRUE, fig.width=10}
+# Funktion zur Berechnung der Renditen
+calculate_returns <- function(stock_data, symbol) {
+  if (!is.null(stock_data[[symbol]])) {
+    stock_data[[symbol]] <- as.data.frame(stock_data[[symbol]])
+    adjusted_col <- paste0(symbol, ".Adjusted")  # Angepasster Schlusskurs
+
+    if (adjusted_col %in% colnames(stock_data[[symbol]])) {
+      # Rendite berechnen
+      stock_data[[symbol]]$Return <- ifelse(
+        !is.na(stock_data[[symbol]]$Buy_Date),  # Wenn ein Kaufdatum existiert
+        {
+          # Kaufpreis (Schlusskurs am Buy_Date)
+          buy_price <- lag(stock_data[[symbol]][, adjusted_col], 3)
+          # Verkaufspreis (Schlusskurs nach 30 Tagen)
+          sell_price <- lead(stock_data[[symbol]][, adjusted_col], 30)
+          # Rendite berechnen
+          (sell_price - buy_price) / buy_price
+        },
+        NA  # Keine Rendite, wenn kein Kaufdatum vorhanden ist
+      )
+      return(stock_data[[symbol]])
+    } else {
+      cat("Adjusted price column not found for:", symbol, "\n")
+      return(NULL)
+    }
+  } else {
+    cat("No data available for:", symbol, "\n")
+    return(NULL)
+  }
+}
+
+# For-Loop, um Renditen für jedes Symbol zu berechnen
+smi_with_returns <- list()
+
+for (i in seq_along(smi_with_buy_dates)) {
+  symbol <- smi_symbols[i]  # Das aktuelle Symbol
+  smi_with_returns[[symbol]] <- calculate_returns(stock_data = smi_with_buy_dates, symbol = symbol)
+}
 ```
 
 ## GenAI Usage
