@@ -13,28 +13,27 @@ editor_options:
 
 CHECK EXAMPLES
 
-
-
-Structure
-## 1. Identification phase: Identification of the appropriate model (descriptive analysis!)
-
+Structure \## 1. Identification phase: Identification of the appropriate
+model (descriptive analysis!)
 
 ### Descriptive analysis
-Objective: Understand how the time series in question are characterized. Results are used as a basis for adequately modelling the subject in question and hence as a basis for inference analysis and forecasting.
 
-− Visualization of the data using basic graphical methods
-− Data preparation and transformation
-− Decomposition of time series
-− Description of the available data using statistical analysis (central moments of the distribution etc.)
-− Multivariate analysis: How do different variables relate to each other?
-− Analysis of time series characteristics using statistical test methods
+Objective: Understand how the time series in question are characterized.
+Results are used as a basis for adequately modelling the subject in
+question and hence as a basis for inference analysis and forecasting.
+
+− Visualization of the data using basic graphical methods − Data
+preparation and transformation − Decomposition of time series −
+Description of the available data using statistical analysis (central
+moments of the distribution etc.) − Multivariate analysis: How do
+different variables relate to each other? − Analysis of time series
+characteristics using statistical test methods
 
 ## 2. Estimation phase: Model specification and estimation of model parameters
 
 ## 3. Diagnostic phase: Evaluation of the quality and validity of the model
 
 ## 4. Operational phase: Use of the estimated model for inference analysis or forecasting
-
 
 ```{r libraries, warning=FALSE, message=FALSE}
 
@@ -45,22 +44,26 @@ library(ggplot2)
 library(dplyr)
 ```
 
-
 ## Bedeutungen der Spaltenüberschriften
 
-Die folgenden Spaltenüberschriften erscheinen in den heruntergeladenen Daten. `[SYMBOL]` steht für das jeweilige Börsensymbol der Aktie.
+Die folgenden Spaltenüberschriften erscheinen in den heruntergeladenen
+Daten. `[SYMBOL]` steht für das jeweilige Börsensymbol der Aktie.
 
-| **Spalte**         | **Bedeutung**                                                                                 |
-|---------------------|-----------------------------------------------------------------------------------------------|
-| `[SYMBOL].Open`    | Eröffnungskurs der Aktie (Price at the market open) an einem bestimmten Handelstag.           |
-| `[SYMBOL].High`    | Höchster Kurs der Aktie während des Handelstages (Highest intraday price).                    |
-| `[SYMBOL].Low`     | Niedrigster Kurs der Aktie während des Handelstages (Lowest intraday price).                  |
-| `[SYMBOL].Close`   | Schlusskurs der Aktie am Ende des Handelstages (Price at the market close).                   |
-| `[SYMBOL].Volume`  | Anzahl der gehandelten Aktien während des Handelstages (Trading volume).                      |
-| `[SYMBOL].Adjusted`| Angepasster Schlusskurs der Aktie, der Dividenden, Splits und andere Anpassungen berücksichtigt (Adjusted close). |
+| **Spalte** | **Bedeutung** |
+|--------------------|----------------------------------------------------|
+| `[SYMBOL].Open` | Eröffnungskurs der Aktie (Price at the market open) an einem bestimmten Handelstag. |
+| `[SYMBOL].High` | Höchster Kurs der Aktie während des Handelstages (Highest intraday price). |
+| `[SYMBOL].Low` | Niedrigster Kurs der Aktie während des Handelstages (Lowest intraday price). |
+| `[SYMBOL].Close` | Schlusskurs der Aktie am Ende des Handelstages (Price at the market close). |
+| `[SYMBOL].Volume` | Anzahl der gehandelten Aktien während des Handelstages (Trading volume). |
+| `[SYMBOL].Adjusted` | Angepasster Schlusskurs der Aktie, der Dividenden, Splits und andere Anpassungen berücksichtigt (Adjusted close). |
 
-
-This section focuses on retrieving historical stock price data for companies listed in the Swiss Market Index (SMI) and the S&P 500 index. It defines the relevant stock symbols, uses a custom function to download data from Yahoo Finance, and handles errors gracefully during the process. The downloaded data is saved as an RDS file for future use, ensuring efficient access and avoiding redundant downloads.
+This section focuses on retrieving historical stock price data for
+companies listed in the Swiss Market Index (SMI) and the S&P 500 index.
+It defines the relevant stock symbols, uses a custom function to
+download data from Yahoo Finance, and handles errors gracefully during
+the process. The downloaded data is saved as an RDS file for future use,
+ensuring efficient access and avoiding redundant downloads.
 
 ```{r share_download, echo = TRUE, fig.width=10}
 
@@ -110,7 +113,10 @@ head(smi_data[["NESN.SW"]],10)
 
 smi_data
 
-This section introduces a function for visualizing the adjusted stock prices of specific companies over time. The function ensures that the required adjusted price data is available and generates a line chart displaying price trends with clear labels and formatting. 
+This section introduces a function for visualizing the adjusted stock
+prices of specific companies over time. The function ensures that the
+required adjusted price data is available and generates a line chart
+displaying price trends with clear labels and formatting.
 
 ```{r chart visual, echo = TRUE, fig.width=10}
 
@@ -143,7 +149,12 @@ plot_stock(smi_data, "NESN.SW")
 # plot_stock(s_p_data, "AAPL")
 ```
 
-This section calculates the daily percentage price changes for each stock's adjusted closing price in the Swiss Market Index (SMI). A utility function is applied across all stocks to compute these changes and store them in a new column. This transformation prepares the data for identifying significant events such as large price changes, which are essential for strategy development.
+This section calculates the daily percentage price changes for each
+stock's adjusted closing price in the Swiss Market Index (SMI). A
+utility function is applied across all stocks to compute these changes
+and store them in a new column. This transformation prepares the data
+for identifying significant events such as large price changes, which
+are essential for strategy development.
 
 ```{r chart Change , echo = TRUE, fig.width=10}
 # The `calc_percent_diff` function calculates the percentage change in the adjusted closing price for a given stock.
@@ -190,19 +201,42 @@ smi_percent_diff <- calc_all_percent_diff(smi_data, smi_symbols)
 # Example: View the first few rows of percentage difference data for "UBSG.SW".
 head(smi_percent_diff[["UBSG.SW"]])
 
-smi_percent_diff
-
 ```
 
-Die Strategie erfordert:
+### Implementation of the Strategy
 
-1. Identifikation von Ereignissen mit ≥ 5 % Kursänderung.
-2. Kauf der Aktie 3 Tage nach dem Ereignis.
-3. Halten der Aktie für 30 Tage.
-4. Berechnung der Renditen.
+The strategy is implemented in several steps to identify and act on
+significant stock price movements systematically:
 
+1.  **Identification of Events**: Significant events are identified as
+    price changes of 5% or more in the adjusted closing price.
+2.  **Stock Purchase**: Stocks are purchased three trading days after a
+    significant event to mitigate overreaction.
+3.  **Holding Period**: The stocks are held for 30 trading days,
+    allowing for potential recovery.
+4.  **Return Calculation**: Returns are calculated based on the buy
+    price and the sell price after 30 days.
 
-```{r strategy_identify, echo = TRUE, fig.width=10}
+Each step is supported by specific code implementations, which are
+detailed below.
+
+1.  **Identifying Events with ≥ 5% Price Changes**\
+    Significant price movements, defined as changes of 5% or more in the
+    adjusted closing price, are critical for triggering trading actions.
+    To identify such events, we calculate the daily percentage change
+    for each stock using the adjusted closing prices. The percentage
+    change is computed using the formula:
+
+    $$
+    \text{Percentage Change} = \left(\frac{\text{Current Price}}{\text{Previous Price}} - 1\right) \times 100
+    $$
+
+    This calculation is applied across all stocks in the dataset, and
+    the results are stored in a new column, `[SYMBOL].Percent_Diff`. A
+    threshold filter is then applied to flag events where the percentage
+    change is greater than or equal to 5% (positive or negative).
+
+```{r event_identification, echo = TRUE, fig.width=10}
 #1. Identifikation von Ereignissen mit ≥ 5 % Kursänderung.
 identify_events <- function(stock_data, symbol, threshold) {
   if (!is.null(stock_data[[symbol]])) {
@@ -232,15 +266,17 @@ for (i in seq_along(smi_percent_diff)) {
                                                threshold = -5.0)
 }
 
-smi_with_events
-
-
-
 ```
 
+2.  **Buying the Stock 3 Days After the Event**\
+    To mitigate market overreaction and ensure a more stable entry
+    point, the strategy specifies buying the stock three trading days
+    after the identified event. This delay allows the market to
+    stabilize and provides an opportunity to enter at a more predictable
+    price level. The corresponding buy date is calculated for each
+    flagged event.
 
-2. Kauf der Aktie 3 Tage nach dem Ereignis.
-```{r strategy_identify, echo = TRUE, fig.width=10}
+```{r buy_3_days_later, echo = TRUE, fig.width=10}
 #2. Kauf der Aktie 3 Tage nach dem Ereignis.
 
 # Funktion zum Hinzufügen des Kaufdatums
@@ -268,11 +304,15 @@ for (i in seq_along(smi_with_events)) {
   smi_with_buy_dates[[symbol]] <- add_buy_dates(stock_data = smi_with_events, symbol = symbol)
 }
 
-
-smi_with_buy_dates
 ```
 
-```{r strategy_identify, echo = TRUE, fig.width=10}
+3.  **Holding the Stock for 30 Days**\
+    After the stock is purchased, it is held for a fixed period of 30
+    trading days. This duration is chosen based on the hypothesis that
+    prices will recover following the initial overreaction, allowing for
+    potential capital appreciation during this window.
+
+```{r holding_period, echo = TRUE, fig.width=10}
 # Funktion zur Berechnung der Renditen
 calculate_returns <- function(stock_data, symbol) {
   if (!is.null(stock_data[[symbol]])) {
@@ -311,6 +351,30 @@ for (i in seq_along(smi_with_buy_dates)) {
   symbol <- smi_symbols[i]  # Das aktuelle Symbol
   smi_with_returns[[symbol]] <- calculate_returns(stock_data = smi_with_buy_dates, symbol = symbol)
 }
+```
+
+4.  **Calculating Returns**\
+    To evaluate the strategy's performance, the return on each trade is
+    calculated as:
+
+    $$
+    \text{Return} = \frac{\text{Sell Price} - \text{Buy Price}}{\text{Buy Price}}
+    $$
+
+    Where:
+
+    -   The **Buy Price** is the adjusted closing price on the
+        calculated buy date.
+    -   The **Sell Price** is the adjusted closing price 30 days after
+        the buy date.
+
+These returns are stored for analysis and aggregated to assess the
+overall profitability of the strategy.
+
+
+```{r calculate_returns, echo = TRUE, fig.width=10}
+
+
 ```
 
 ## GenAI Usage
