@@ -50,7 +50,7 @@ Die folgenden Spaltenüberschriften erscheinen in den heruntergeladenen
 Daten. `[SYMBOL]` steht für das jeweilige Börsensymbol der Aktie.
 
 | **Spalte** | **Bedeutung** |
-|--------------------|----------------------------------------------------|
+|-----------------------|-------------------------------------------------|
 | `[SYMBOL].Open` | Eröffnungskurs der Aktie (Price at the market open) an einem bestimmten Handelstag. |
 | `[SYMBOL].High` | Höchster Kurs der Aktie während des Handelstages (Highest intraday price). |
 | `[SYMBOL].Low` | Niedrigster Kurs der Aktie während des Handelstages (Lowest intraday price). |
@@ -142,8 +142,8 @@ plot_stock <- function(stock_data, symbol) {
 }
 
 
-# Example usage: Visualize adjusted prices for the Nestlé stock ("NESN.SW").
-plot_stock(smi_data, "NESN.SW")
+# Example usage: Visualize adjusted prices for the UBS stock.
+plot_stock(smi_data, "UBSG.SW")
 
 # Example usage: Visualize adjusted prices for Apple stock in the S&P 500.
 # plot_stock(s_p_data, "AAPL")
@@ -234,7 +234,7 @@ detailed below.
     This calculation is applied across all stocks in the dataset, and
     the results are stored in a new column, `[SYMBOL].Percent_Diff`. A
     threshold filter is then applied to flag events where the percentage
-    change is greater than or equal to 5% (positive or negative).
+    change is lower or equal to -5%.
 
 ```{r event_identification, echo = TRUE, fig.width=10}
 #1. Identifikation von Ereignissen mit ≥ 5 % Kursänderung.
@@ -265,6 +265,7 @@ for (i in seq_along(smi_percent_diff)) {
                                                symbol = symbol, 
                                                threshold = -5.0)
 }
+head(smi_with_events[["UBSG.SW"]],10)
 
 ```
 
@@ -277,18 +278,30 @@ for (i in seq_along(smi_percent_diff)) {
     flagged event.
 
 ```{r buy_3_days_later, echo = TRUE, fig.width=10}
-#2. Kauf der Aktie 3 Tage nach dem Ereignis.
-
-# Funktion zum Hinzufügen des Kaufdatums
+#library(dplyr)  # Lade dplyr für if_else
+# Funktion zum Hinzufügen des Kaufdatums (3. Handelsdatum nach Event)
 add_buy_dates <- function(stock_data, symbol) {
   if (!is.null(stock_data[[symbol]])) {
     stock_data[[symbol]] <- as.data.frame(stock_data[[symbol]])
-    # Hinzufügen der Spalte "Buy_Date", 3 Tage nach einem Ereignis
-    stock_data[[symbol]]$Buy_Date <- ifelse(
-      stock_data[[symbol]]$Event,  # Wenn ein Ereignis identifiziert wurde
-      index(stock_data[[symbol]]) + 3,  # Kaufdatum = Ereignisdatum + 3 Tage
-      NA  # Sonst NA
-    )
+    
+    # TODO : braucht es eventuell nicht mehr
+    # Konvertiere den Index in ein Date-Objekt und speichere es als Event_Date
+    stock_data[[symbol]]$Event_Date <- as.Date(row.names(stock_data[[symbol]]))
+    
+    # Initialisiere Buy_Date mit NA
+    stock_data[[symbol]]$Buy_Date <- as.Date(NA)
+    
+    # Berechne das 3. Handelsdatum nach dem Event
+    for (i in which(stock_data[[symbol]]$Event)) {
+      current_index <- i
+      future_index <- current_index + 3  # Das 3. Handelsdatum (Index-basiert)
+      
+      # Prüfe, ob der zukünftige Index innerhalb der DataFrame-Grenzen liegt
+      if (future_index <= nrow(stock_data[[symbol]])) {
+        stock_data[[symbol]]$Buy_Date[current_index] <- stock_data[[symbol]]$Event_Date[future_index]
+      }
+    }
+    
     return(stock_data[[symbol]])
   } else {
     cat("No data available for:", symbol, "\n")
@@ -296,13 +309,17 @@ add_buy_dates <- function(stock_data, symbol) {
   }
 }
 
-# For-Loop, um Kaufdaten hinzuzufügen
+# For-Loop, um Kaufdaten und Ereignisdatum hinzuzufügen
 smi_with_buy_dates <- list()
 
 for (i in seq_along(smi_with_events)) {
   symbol <- smi_symbols[i]  # Das aktuelle Symbol
   smi_with_buy_dates[[symbol]] <- add_buy_dates(stock_data = smi_with_events, symbol = symbol)
 }
+
+# Beispiel: UBSG.SW anzeigen
+head(smi_with_buy_dates[["UBSG.SW"]][, c("Event_Date", "Buy_Date", "Event")], 1000)
+
 
 ```
 
@@ -311,6 +328,24 @@ for (i in seq_along(smi_with_events)) {
     trading days. This duration is chosen based on the hypothesis that
     prices will recover following the initial overreaction, allowing for
     potential capital appreciation during this window.
+
+    **Calculating Returns**\
+    To evaluate the strategy's performance, the return on each trade is
+    calculated as:
+
+    $$
+    \text{Return} = \frac{\text{Sell Price} - \text{Buy Price}}{\text{Buy Price}}
+    $$
+
+    Where:
+
+    -   The **Buy Price** is the adjusted closing price on the
+        calculated buy date.
+    -   The **Sell Price** is the adjusted closing price 30 days after
+        the buy date.
+
+These returns are stored for analysis and aggregated to assess the
+overall profitability of the strategy.
 
 ```{r holding_period, echo = TRUE, fig.width=10}
 # Funktion zur Berechnung der Renditen
@@ -351,28 +386,159 @@ for (i in seq_along(smi_with_buy_dates)) {
   symbol <- smi_symbols[i]  # Das aktuelle Symbol
   smi_with_returns[[symbol]] <- calculate_returns(stock_data = smi_with_buy_dates, symbol = symbol)
 }
+
+head(smi_with_returns[["UBSG.SW"]],1000)
 ```
 
-4.  **Calculating Returns**\
-    To evaluate the strategy's performance, the return on each trade is
-    calculated as:
+4.  **Summary of the results**
 
-    $$
-    \text{Return} = \frac{\text{Sell Price} - \text{Buy Price}}{\text{Buy Price}}
-    $$
+ 1. We calculate metrics that quantify the performance of the strategy:
 
-    Where:
+-   **Average return**: average return across all transactions.
 
-    -   The **Buy Price** is the adjusted closing price on the
-        calculated buy date.
-    -   The **Sell Price** is the adjusted closing price 30 days after
-        the buy date.
+-   **Median return:** Avoids distortion due to outliers.
 
-These returns are stored for analysis and aggregated to assess the
-overall profitability of the strategy.
+-   **Positive vs. negative returns:** Proportion of positive returns.
 
+-   **Maximum and minimum return**: Identification of extremes.
+
+-   **Total return:** Total return when applying the strategy to the
+    entire portfolio.
 
 ```{r calculate_returns, echo = TRUE, fig.width=10}
+
+# Funktion zum Zusammenfassen der Ergebnisse und Extrahieren der Renditen
+summarize_results <- function(stock_data) {
+  # Alle Renditen aus der Liste extrahieren
+  returns <- do.call(rbind, lapply(stock_data, function(df) {
+    if (!is.null(df$Return)) {
+      return(df$Return)
+    } else {
+      return(NULL)
+    }
+  }))
+  
+  # Entferne NA-Werte
+  returns <- returns[!is.na(returns)]
+  
+  # Berechnung der Kennzahlen
+  summary <- list(
+    average_return = mean(returns),  # Durchschnittliche Rendite
+    median_return = median(returns),  # Medianrendite
+    positive_ratio = sum(returns > 0) / length(returns),  # Anteil positiver Renditen
+    max_return = max(returns),  # Maximale Rendite
+    min_return = min(returns),  # Minimale Rendite
+    total_return = sum(returns)  # Gesamtrendite
+  )
+  
+  # Renditen global speichern, falls benötigt
+  assign("returns", returns, envir = .GlobalEnv)
+  
+  return(summary)
+}
+
+# Ergebnisse für SMI zusammenfassen und Renditen global verfügbar machen
+results_summary <- summarize_results(smi_with_returns)
+
+# Ergebnisse ausgeben
+print(results_summary)
+
+
+
+```
+
+### 2. **Visualisierung**
+
+Visualisierungen helfen dabei, die Strategie intuitiv zu verstehen.
+
+#### a) Verteilung der Renditen:
+
+Histogramm zeigt die Häufigkeit positiver und negativer Renditen.
+
+```{r visualize_returns, echo = TRUE, fig.width=10}
+
+ggplot(data = data.frame(Return = returns), aes(x = Return)) +
+geom_histogram(binwidth = 0.01, fill = "blue", color = "white") +
+labs(title = "Verteilung der Renditen", x = "Rendite", y =
+"Häufigkeit") + theme_minimal()
+
+```
+
+**b) Development over time:**
+
+Scatterplot showing returns over time and possible patterns.
+
+```{r visualize_returns, echo = TRUE, fig.width=10}  
+
+# Liste zu einem DataFrame zusammenführen und nur gültige Zeilen übernehmen
+all_returns <- do.call(rbind, lapply(smi_with_returns, function(df) {
+  if (!is.null(df$Buy_Date) & !is.null(df$Return)) {
+    # Wähle nur Zeilen aus, bei denen Buy_Date und Return nicht NA sind
+    valid_rows <- df[!is.na(df$Buy_Date) & !is.na(df$Return), c("Buy_Date", "Return")]
+    return(valid_rows)
+  }
+  return(NULL)
+}))
+
+# Sicherstellen, dass Buy_Date als Date-Objekt behandelt wird
+all_returns$Buy_Date <- as.Date(all_returns$Buy_Date)
+
+# Scatterplot der Renditen über die Zeit
+ggplot(data = all_returns, aes(x = Buy_Date, y = Return)) +
+  geom_point(alpha = 0.5, color = "blue") +
+  labs(title = "Renditen über die Zeit", x = "Kaufdatum", y = "Rendite") +
+  theme_minimal()
+
+```
+
+Punkt 3: Evaluation der Strategie
+In Punkt 3 evaluieren wir die Strategie durch Performance-Metriken und Risikoanalysen. Das Ziel ist, die Qualität der Strategie zu bewerten und ihre Stabilität in unterschiedlichen Marktphasen zu verstehen.
+
+1. Vergleich mit Benchmarks
+Die durchschnittliche Rendite der Strategie wird mit einem Marktindex wie dem S&P 500 (oder einem relevanten Benchmark wie dem SMI) verglichen.
+
+```{r benchmark, echo = TRUE, fig.width=10}  
+
+library(tidyr)
+
+# Logarithmische Renditen und kumulierte Renditen berechnen
+smi_benchmark <- smi_benchmark %>%
+  mutate(
+    Return = log(adjusted / lag(adjusted)),  # Logarithmische Renditen
+    Return = replace_na(Return, 0),  # Ersetze NA-Werte durch 0 für die erste Zeile
+    Cum_Return = cumprod(1 + Return)  # Kumulierte Rendite
+  )
+
+print(smi_benchmark, n= 1000)
+
+
+
+
+```
+
+```{r benchmark, echo = TRUE, fig.width=10}  
+
+# Maximale Länge der beiden Reihen bestimmen
+max_length <- max(length(returns), nrow(smi_benchmark))
+
+# Strategie-Renditen mit NA auffüllen
+strategy_combined <- c(returns, rep(NA, max_length - length(returns)))
+
+# SMI-Renditen mit NA auffüllen
+smi_combined <- c(smi_benchmark$Cum_Return, rep(NA, max_length - nrow(smi_benchmark)))
+
+# Datum kombinieren
+dates_combined <- c(as.Date(smi_benchmark$date), rep(NA, max_length - nrow(smi_benchmark)))
+
+# Datenrahmen für den Vergleich erstellen
+benchmark_data <- data.frame(
+  Date = dates_combined,
+  SMI = smi_combined,
+  Strategy = strategy_combined
+)
+
+# Überprüfung des kombinierten Datensatzes
+head(benchmark_data)
 
 
 ```
