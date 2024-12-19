@@ -11,29 +11,6 @@ editor_options:
     wrap: 72
 ---
 
-CHECK EXAMPLES
-
-Structure \## 1. Identification phase: Identification of the appropriate
-model (descriptive analysis!)
-
-### Descriptive analysis
-
-Objective: Understand how the time series in question are characterized.
-Results are used as a basis for adequately modelling the subject in
-question and hence as a basis for inference analysis and forecasting.
-
-− Visualization of the data using basic graphical methods − Data
-preparation and transformation − Decomposition of time series −
-Description of the available data using statistical analysis (central
-moments of the distribution etc.) − Multivariate analysis: How do
-different variables relate to each other? − Analysis of time series
-characteristics using statistical test methods
-
-## 2. Estimation phase: Model specification and estimation of model parameters
-
-## 3. Diagnostic phase: Evaluation of the quality and validity of the model
-
-## 4. Operational phase: Use of the estimated model for inference analysis or forecasting
 
 ```{r libraries, warning=FALSE, message=FALSE}
 
@@ -107,11 +84,7 @@ smi_data <- download_data(smi_symbols)
 saveRDS(smi_data, file = "smi_stock_data.rds")
 #saveRDS(s_p_data, file = "s_p_stock_data.rds")
 
-# Example: Accessing data for a specific stock (e.g., Nestlé)
-c
 ```
-
-smi_data
 
 This section introduces a function for visualizing the adjusted stock
 prices of specific companies over time. The function ensures that the
@@ -265,7 +238,7 @@ for (i in seq_along(smi_percent_diff)) {
                                                symbol = symbol, 
                                                threshold = -5.0)
 }
-head(smi_with_events[["UBSG.SW"]],10)
+head(smi_with_events[["UBSG.SW"]],100)
 
 ```
 
