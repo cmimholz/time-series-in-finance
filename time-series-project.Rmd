@@ -1,48 +1,140 @@
 ---
-title: "TIME SERIES ANALYSIS"
+title: "The Barney Stinson's 3-Day Rule Strategy"
 author: "Victor Anton, Imholz Chris"
 date: "19.12.2024"
 output:
-  html_document: default
-  pdf_document: default
-editor_options:
-  chunk_output_type: console
-  markdown:
-    wrap: 72
+  prettydoc::html_pretty:
+    theme: hpstr
+    highlight: github
+    toc: yes
+    toc_depth: 1
+    number_sections: yes
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+knit:
+  citations: yes
 ---
 
+```{=html}
+<style>
+body {font-size: 14px;}
+p {font-size: 14px;}
+h1{font-size: 17pt;}
+h2{font-size: 15pt;}
+h3,h4,h5,h6{font-size: 14pt;}
+div.r-plot {width: 60%; margin: auto;}
+img {
+  max-width: 60%; 
+  height: auto;
+  display: block;
+  margin: auto;
+}
+table {
+  font-size: 16px;
+  line-height: 0.8;
+}
+</style>
 
-```{r libraries, warning=FALSE, message=FALSE}
-
-# Load libraries
-library(tidyquant)
-library(quantmod)
-library(ggplot2)
-library(dplyr)
 ```
 
-## Bedeutungen der Spaltenüberschriften
 
-Die folgenden Spaltenüberschriften erscheinen in den heruntergeladenen
-Daten. `[SYMBOL]` steht für das jeweilige Börsensymbol der Aktie.
+```{r setup, include = FALSE, warning = FALSE}
+library(knitr)
+opts_chunk$set(
+  echo = TRUE,
+  eval = TRUE,
+  warning = FALSE,
+  message = FALSE)
+```
 
-| **Spalte** | **Bedeutung** |
-|-----------------------|-------------------------------------------------|
-| `[SYMBOL].Open` | Eröffnungskurs der Aktie (Price at the market open) an einem bestimmten Handelstag. |
-| `[SYMBOL].High` | Höchster Kurs der Aktie während des Handelstages (Highest intraday price). |
-| `[SYMBOL].Low` | Niedrigster Kurs der Aktie während des Handelstages (Lowest intraday price). |
-| `[SYMBOL].Close` | Schlusskurs der Aktie am Ende des Handelstages (Price at the market close). |
-| `[SYMBOL].Volume` | Anzahl der gehandelten Aktien während des Handelstages (Trading volume). |
-| `[SYMBOL].Adjusted` | Angepasster Schlusskurs der Aktie, der Dividenden, Splits und andere Anpassungen berücksichtigt (Adjusted close). |
+<br>
 
-This section focuses on retrieving historical stock price data for
-companies listed in the Swiss Market Index (SMI) and the S&P 500 index.
-It defines the relevant stock symbols, uses a custom function to
-download data from Yahoo Finance, and handles errors gracefully during
-the process. The downloaded data is saved as an RDS file for future use,
-ensuring efficient access and avoiding redundant downloads.
+## **Objective**
 
-```{r share_download, echo = TRUE, fig.width=10}
+The purpose of this report is to design and evaluate a robust **trading strategy** for stocks listed in the **Swiss Market Index (SMI)** using the **3-Day Rule**. The strategy consists of:
+
+1. **Identifying Significant Price Drops**: Recognize stock price drops of ≥ 5%.
+2. **3-Day Rule Execution**: Buy the stock 3 days after the significant drop.
+3. **Performance Evaluation**: Assess the strategy based on:
+   - Returns
+   - Sharpe Ratio
+   - Cumulative Returns
+4. **Exploration of Alternative Strategies**: Implement and compare methods like Mean Reversion and Trend-Following.
+
+1. Identifies significant price drops (≥ 5%).
+2. Implements the 3-day rule for buying stocks after such events.
+3. Evaluates the performance of the strategy using returns, Sharpe Ratio, and cumulative returns.
+4. Enhances analysis with time series decomposition and ARIMA modeling.
+
+---
+
+## **Structure**
+
+### **1. Identification Phase**
+- **Visualizing Data**: Using plots to understand stock trends.
+- **Preparing Data**: Cleaning and calculating key metrics like percentage price changes.
+- **Decomposition**: Splitting stock prices into trend, seasonality, and residuals.
+- **Statistical Analysis**: Examining central moments and relationships among variables.
+
+### **2. Estimation Phase**
+- **ARIMA Forecasting**: Specifying and estimating time series models.
+
+### **3. Diagnostic Phase**
+- **Performance Checks**: Evaluating the model’s accuracy and results using:
+  - Returns, Success Rates, and Sharpe Ratios.
+  - Backtesting on alternative strategies.
+
+### **4. Operational Phase**
+- **Execution and Reporting**: Forecasting future price trends and implementing the trading strategy.
+
+---
+
+## **1. Data Preparation**
+### **Load Required Libraries**
+## Libraries
+
+In this report the following libraries are used.
+
+<details>
+
+<summary>*Click to see all libraries*</summary>
+
+```{r libraries, class.source = "fold-show"}
+if (!require("quantmod")) install.packages("quantmod")
+if (!require("dplyr")) install.packages("dplyr")
+if (!require("ggplot2")) install.packages("ggplot2")
+if (!require("forecast")) install.packages("forecast")
+if (!require("TTR")) install.packages("TTR")
+
+library(quantmod)
+library(dplyr)
+library(forecast)
+library(TTR)
+```
+
+</details>
+
+<br>
+
+### **Column Descriptions**
+
+The following column names appear in the downloaded data. `[SYMBOL]` represents the stock ticker:
+
+| **Column**         | **Description**                                                                                |
+|--------------------|------------------------------------------------------------------------------------------------|
+| `[SYMBOL].Open`    | Opening price of the stock on a given trading day.                                             |
+| `[SYMBOL].High`    | Highest intraday price of the stock.                                                           |
+| `[SYMBOL].Low`     | Lowest intraday price of the stock.                                                            |
+| `[SYMBOL].Close`   | Closing price of the stock at the end of the trading day.                                      |
+| `[SYMBOL].Volume`  | Number of shares traded during the trading day.                                                |
+| `[SYMBOL].Adjusted`| Adjusted closing price accounting for dividends, splits, and other adjustments.                |
+
+
+This section outlines the process of retrieving historical stock price data for companies listed in the Swiss Market Index (SMI) and the S&P 500 index. It specifies the relevant stock symbols and employs a custom function to download the data from Yahoo Finance. The function also includes error handling to manage any issues during the download process. Once the data is downloaded, it is saved as an RDS file to ensure efficient future access and prevent redundant downloads.
+
+
+```{r shares_download, echo=FALSE, warning = FALSE, fig.width=10}
 
 # Define a list of stock symbols for the Swiss Market Index (SMI). 
 # These symbols represent the 20 largest publicly traded companies in Switzerland.
@@ -56,8 +148,8 @@ smi_symbols <- c(
 
 # Retrieve the list of symbols for companies in the S&P 500 index.
 # The tq_index function fetches up-to-date information on all S&P 500 components.
- sp500 <- tq_index("SP500")
- head(sp500)
+# sp500 <- tq_index("SP500")
+# head(sp500)
 
 # Function to download historical stock price data for a given list of symbols.
 download_data <- function(symbols, start_date = "2022-01-01",end_date = Sys.Date()) {
@@ -81,17 +173,19 @@ smi_data <- download_data(smi_symbols)
 #s_p_data <- download_data(sp500$symbol)
 
 # Save the downloaded SMI stock data as an RDS file.
-saveRDS(smi_data, file = "smi_stock_data.rds")
+#saveRDS(smi_data, file = "smi_stock_data.rds")
 #saveRDS(s_p_data, file = "s_p_stock_data.rds")
 
 ```
 
-This section introduces a function for visualizing the adjusted stock
-prices of specific companies over time. The function ensures that the
-required adjusted price data is available and generates a line chart
-displaying price trends with clear labels and formatting.
+### **Visualizing Adjusted Stock Prices Over Time**
 
-```{r chart visual, echo = TRUE, fig.width=10}
+This section introduces a function for visualizing the adjusted stock prices of specific companies over time. The function ensures that the required adjusted price data is available and generates a line chart displaying price trends. The chart is designed with clear labels, titles, and formatting to enhance readability. This visualization aids in understanding the historical performance of the stocks and identifying trends or patterns that could inform investment strategies.
+
+In this example, we plot the UBS stock prices.
+
+```{r ubs_stock_plot, echo=FALSE, warning = FALSE, fig.width=10}
+
 
 # Define a custom function `plot_stock` to visualize the adjusted closing prices of a stock.
 plot_stock <- function(stock_data, symbol) {
@@ -122,14 +216,15 @@ plot_stock(smi_data, "UBSG.SW")
 # plot_stock(s_p_data, "AAPL")
 ```
 
-This section calculates the daily percentage price changes for each
-stock's adjusted closing price in the Swiss Market Index (SMI). A
-utility function is applied across all stocks to compute these changes
-and store them in a new column. This transformation prepares the data
-for identifying significant events such as large price changes, which
-are essential for strategy development.
+### **Calculating Daily Percentage Price Changes for SMI Stocks**
 
-```{r chart Change , echo = TRUE, fig.width=10}
+This section calculates the daily percentage price changes for each stock's adjusted closing price in the Swiss Market Index (SMI). A utility function is applied across all stocks to compute these changes and store them in a new column. This transformation prepares the data for identifying significant events, such as large price changes, which are essential for strategy development.
+
+<details>
+
+<summary>*Click to see percentage difference data for "UBSG.SW"*</summary>
+
+```{r percent_diff, class.source = "fold-show"}
 # The `calc_percent_diff` function calculates the percentage change in the adjusted closing price for a given stock.
 calc_percent_diff <- function(stock_data, symbol) {
   if (!is.null(stock_data[[symbol]])) {
@@ -176,6 +271,12 @@ head(smi_percent_diff[["UBSG.SW"]])
 
 ```
 
+</details>
+
+<br>
+
+
+
 ### Implementation of the Strategy
 
 The strategy is implemented in several steps to identify and act on
@@ -200,17 +301,21 @@ detailed below.
     for each stock using the adjusted closing prices. The percentage
     change is computed using the formula:
 
-    $$
-    \text{Percentage Change} = \left(\frac{\text{Current Price}}{\text{Previous Price}} - 1\right) \times 100
-    $$
+$$
+  \text{Percentage Change} = \left(\frac{\text{Current Price}}{\text{Previous Price}} - 1\right) \times 100
+$$
 
     This calculation is applied across all stocks in the dataset, and
     the results are stored in a new column, `[SYMBOL].Percent_Diff`. A
     threshold filter is then applied to flag events where the percentage
     change is lower or equal to -5%.
 
-```{r event_identification, echo = TRUE, fig.width=10}
-#1. Identifikation von Ereignissen mit ≥ 5 % Kursänderung.
+<details>
+
+<summary>*Click to see all identified events for UBS*</summary>
+
+```{r event_identification, class.source = "fold-show"}
+# 1. Identifying Events with ≥ 5% Price Change.
 identify_events <- function(stock_data, symbol, threshold) {
   if (!is.null(stock_data[[symbol]])) {
     percent_diff_col <- paste0(symbol, ".Percent_Diff")
@@ -228,29 +333,36 @@ identify_events <- function(stock_data, symbol, threshold) {
   }
 }
 
-# Initialisiere eine leere Liste, um Ergebnisse zu speichern
+# Initialize an empty list to store results
 smi_with_events <- list()
 
-# For-Loop, um Ereignisse zu identifizieren
+# For loop to identify events
 for (i in seq_along(smi_percent_diff)) {
-  symbol <- smi_symbols[i]  # Das aktuelle Symbol
+  symbol <- smi_symbols[i]  # Current symbol
   smi_with_events[[symbol]] <- identify_events(stock_data = smi_percent_diff, 
                                                symbol = symbol, 
                                                threshold = -5.0)
 }
-head(smi_with_events[["UBSG.SW"]],100)
+
+head(smi_with_events[["UBSG.SW"]], 100)
+
 
 ```
 
-2.  **Buying the Stock 3 Days After the Event**\
-    To mitigate market overreaction and ensure a more stable entry
-    point, the strategy specifies buying the stock three trading days
-    after the identified event. This delay allows the market to
-    stabilize and provides an opportunity to enter at a more predictable
-    price level. The corresponding buy date is calculated for each
-    flagged event.
+</details>
 
-```{r buy_3_days_later, echo = TRUE, fig.width=10}
+<br>
+
+
+#### 2. Buying the Stock 3 Days After the Event
+
+To mitigate market overreaction and ensure a more stable entry point, the strategy specifies buying the stock three trading days after the identified event. This delay allows the market to stabilize and provides an opportunity to enter at a more predictable price level. The corresponding buy date is calculated for each flagged event.
+
+<details>
+
+<summary>*Click to see all libraries*</summary>
+
+```{r buy_3_days_later, class.source = "fold-show"}
 #library(dplyr)  # Lade dplyr für if_else
 # Funktion zum Hinzufügen des Kaufdatums (3. Handelsdatum nach Event)
 add_buy_dates <- function(stock_data, symbol) {
@@ -292,35 +404,37 @@ for (i in seq_along(smi_with_events)) {
 
 # Beispiel: UBSG.SW anzeigen
 head(smi_with_buy_dates[["UBSG.SW"]][, c("Event_Date", "Buy_Date", "Event")], 1000)
-
-
 ```
 
-3.  **Holding the Stock for 30 Days**\
-    After the stock is purchased, it is held for a fixed period of 30
-    trading days. This duration is chosen based on the hypothesis that
-    prices will recover following the initial overreaction, allowing for
-    potential capital appreciation during this window.
+</details>
 
-    **Calculating Returns**\
-    To evaluate the strategy's performance, the return on each trade is
-    calculated as:
+<br>
 
-    $$
-    \text{Return} = \frac{\text{Sell Price} - \text{Buy Price}}{\text{Buy Price}}
-    $$
 
-    Where:
+#### 3. Holding the Stock for 30 Days
 
-    -   The **Buy Price** is the adjusted closing price on the
-        calculated buy date.
-    -   The **Sell Price** is the adjusted closing price 30 days after
-        the buy date.
+After the stock is purchased, it is held for a fixed period of 30 trading days. This duration is chosen based on the hypothesis that prices will recover following the initial overreaction, allowing for potential capital appreciation during this window.
 
-These returns are stored for analysis and aggregated to assess the
-overall profitability of the strategy.
+#### Calculating Returns
 
-```{r holding_period, echo = TRUE, fig.width=10}
+To evaluate the strategy's performance, the return on each trade is calculated as:
+
+$$
+  \text{Return} = \frac{\text{Sell Price} - \text{Buy Price}}{\text{Buy Price}}
+$$
+
+Where:
+
+- The **Buy Price** is the adjusted closing price on the calculated buy date.
+- The **Sell Price** is the adjusted closing price 30 days after the buy date.
+
+These returns are stored for analysis and aggregated to assess the overall profitability of the strategy.
+
+<details>
+
+<summary>*Click to see all libraries*</summary>
+
+```{r holding_period, class.source = "fold-show"}
 # Funktion zur Berechnung der Renditen
 calculate_returns <- function(stock_data, symbol) {
   if (!is.null(stock_data[[symbol]])) {
@@ -363,26 +477,40 @@ for (i in seq_along(smi_with_buy_dates)) {
 head(smi_with_returns[["UBSG.SW"]],1000)
 ```
 
-4.  **Summary of the results**
+</details>
 
- 1. We calculate metrics that quantify the performance of the strategy:
+<br>
 
--   **Average return**: average return across all transactions.
 
--   **Median return:** Avoids distortion due to outliers.
+#### 4. Summary of the Results
 
--   **Positive vs. negative returns:** Proportion of positive returns.
+The performance of the strategy is quantified using several key metrics:
 
--   **Maximum and minimum return**: Identification of extremes.
+- **Average Return**: The average return across all transactions.
+- **Median Return**: The median return, which helps avoid distortion due to outliers.
+- **Positive vs. Negative Returns**: The proportion of positive returns relative to negative returns.
+- **Maximum and Minimum Return**: Identification of the maximum and minimum returns across the trades.
+- **Total Return**: The total return when applying the strategy to the entire portfolio.
 
--   **Total return:** Total return when applying the strategy to the
-    entire portfolio.
+These metrics are calculated using the following dataset, which includes event dates, buy dates, and returns:
 
-```{r calculate_returns, echo = TRUE, fig.width=10}
+| Event_Date | Buy_Date   | Return     |
+|------------|------------|------------|
+| 2022-01-03 | 2022-01-03 | <NA>       |
+| 2022-01-04 | 2022-01-04 | <NA>       |
+| 2022-01-05 | 2022-01-05 | <NA>       |
+| ...        | ...        | ...        |
+| 2022-02-24 | 2022-02-24 | -0.0597    |
+| 2022-03-01 | 2022-03-01 |  0.0585    |
+| 2022-03-04 | 2022-03-04 |  0.0813    |
+| ...        | ...        | ...        |
 
-# Funktion zum Zusammenfassen der Ergebnisse und Extrahieren der Renditen
+The returns are calculated by comparing the buy and sell prices, with the strategy's overall performance aggregated to assess profitability.
+
+```{r calculate_returns, echo = FALSE, fig.width=10}
+# Function to summarize the results and extract returns
 summarize_results <- function(stock_data) {
-  # Alle Renditen aus der Liste extrahieren
+  # Extract all returns from the list
   returns <- do.call(rbind, lapply(stock_data, function(df) {
     if (!is.null(df$Return)) {
       return(df$Return)
@@ -391,29 +519,29 @@ summarize_results <- function(stock_data) {
     }
   }))
   
-  # Entferne NA-Werte
+  # Remove NA values
   returns <- returns[!is.na(returns)]
   
-  # Berechnung der Kennzahlen
+  # Calculate metrics
   summary <- list(
-    average_return = mean(returns),  # Durchschnittliche Rendite
-    median_return = median(returns),  # Medianrendite
-    positive_ratio = sum(returns > 0) / length(returns),  # Anteil positiver Renditen
-    max_return = max(returns),  # Maximale Rendite
-    min_return = min(returns),  # Minimale Rendite
-    total_return = sum(returns)  # Gesamtrendite
+    average_return = mean(returns),  # Average return
+    median_return = median(returns),  # Median return
+    positive_ratio = sum(returns > 0) / length(returns),  # Proportion of positive returns
+    max_return = max(returns),  # Maximum return
+    min_return = min(returns),  # Minimum return
+    total_return = sum(returns)  # Total return
   )
   
-  # Renditen global speichern, falls benötigt
+  # Store returns globally if needed
   assign("returns", returns, envir = .GlobalEnv)
   
   return(summary)
 }
 
-# Ergebnisse für SMI zusammenfassen und Renditen global verfügbar machen
+# Summarize results for SMI and make returns globally available
 results_summary <- summarize_results(smi_with_returns)
 
-# Ergebnisse ausgeben
+# Print the results
 print(results_summary)
 ```
 
@@ -426,12 +554,11 @@ Objective:
 The histogram shows the frequency of positive and negative returns, providing a clear overview of the return distribution. This helps identify whether the strategy generates more positive or negative returns and highlights the variability of returns.
 
 
-```{r visualize_returns, echo = TRUE, fig.width=10}
-
+```{r Distribution of Returns, echo = TRUE, fig.width=10}
 ggplot(data = data.frame(Return = returns), aes(x = Return)) +
-geom_histogram(binwidth = 0.01, fill = "blue", color = "white") +
-labs(title = "Verteilung der Renditen", x = "Rendite", y =
-"Häufigkeit") + theme_minimal()
+  geom_histogram(binwidth = 0.01, fill = "blue", color = "white") +
+  labs(title = "Distribution of Returns", x = "Return", y = "Frequency") + 
+  theme_minimal()
 
 ```
 
@@ -454,14 +581,10 @@ all_returns <- do.call(rbind, lapply(smi_with_returns, function(df) {
 # Ensure Buy_Date is treated as a Date object
 all_returns$Buy_Date <- as.Date(all_returns$Buy_Date)
 
-# Conditional color assignment: red for negative, green for positive, black for zero
-all_returns$Color <- ifelse(all_returns$Return < 0, "red", 
-                            ifelse(all_returns$Return > 0, "green", "black"))
-
-# Scatterplot of returns over time with color-coded points
-ggplot(data = all_returns, aes(x = Buy_Date, y = Return, color = Color)) +
+# Scatterplot of returns over time with color-coded points in a blue scale
+ggplot(data = all_returns, aes(x = Buy_Date, y = Return, color = Return)) +
   geom_point(alpha = 0.7) +  # Semi-transparent points for better visibility
-  scale_color_identity() +   # Use the predefined colors without adding a legend
+  scale_color_gradient2(low = "lightblue", mid = "blue", high = "darkblue", midpoint = 0) +  # Blue scale
   labs(title = "Returns Over Time", x = "Buy Date", y = "Return") +
   theme_minimal()            # Apply a clean, minimal theme
 ```
@@ -475,31 +598,31 @@ It is important to note that the average return calculated here is **not weighte
 The Buy-and-Hold approach assumes no active trading decisions, offering a simple and passive investment strategy. By comparing this benchmark to the cumulative return of the trading strategy, we can assess whether active trading outperforms or underperforms a passive investment approach.
 
 
-```{r benchmark, echo = TRUE, fig.width=10}  
+```{r benchmark_buy_and_hold, echo = TRUE, fig.width=10}
 
-# Funktion zur Implementierung der Buy-and-Hold-Strategie
+# Function to implement the Buy-and-Hold strategy
 buy_and_hold_strategy <- function(stock_data, symbol, start_date, end_date) {
   if (!is.null(stock_data[[symbol]])) {
     stock_data[[symbol]] <- as.data.frame(stock_data[[symbol]])
     
-    adjusted_col <- paste0(symbol, ".Adjusted")  # Angepasster Schlusskurs
+    adjusted_col <- paste0(symbol, ".Adjusted")  # Adjusted closing price
     
     if (adjusted_col %in% colnames(stock_data[[symbol]])) {
-      # Daten filtern für den angegebenen Zeitraum
+      # Filter data for the specified date range
       stock_subset <- stock_data[[symbol]][as.Date(row.names(stock_data[[symbol]])) >= as.Date(start_date) &
                                              as.Date(row.names(stock_data[[symbol]])) <= as.Date(end_date), ]
       
-      # Sicherstellen, dass es genügend Daten gibt
+      # Ensure there is enough data
       if (nrow(stock_subset) >= 2) {
-        # Kaufpreis (angepasster Schlusskurs am Startdatum)
+        # Buy price (adjusted closing price on the start date)
         buy_price <- stock_subset[1, adjusted_col]
-        # Verkaufspreis (angepasster Schlusskurs am Enddatum)
+        # Sell price (adjusted closing price on the end date)
         sell_price <- stock_subset[nrow(stock_subset), adjusted_col]
-        # Rendite berechnen
+        # Calculate return
         return <- (sell_price - buy_price) / buy_price
         return(return)
       } else {
-        cat("Nicht genügend Daten für:", symbol, "\n")
+        cat("Not enough data for:", symbol, "\n")
         return(NA)
       }
     } else {
@@ -512,27 +635,28 @@ buy_and_hold_strategy <- function(stock_data, symbol, start_date, end_date) {
   }
 }
 
-# Benchmarking für alle SMI-Aktien
+# Benchmarking for all SMI stocks
 benchmark_smi <- function(stock_data, symbols, start_date, end_date) {
   returns <- sapply(symbols, function(symbol) {
     buy_and_hold_strategy(stock_data, symbol, start_date, end_date)
   })
-  # Durchschnittliche Rendite des Benchmarks
+  # Average return of the benchmark
   avg_return <- mean(returns, na.rm = TRUE)
   return(list(individual_returns = returns, average_return = avg_return))
 }
 
-# Start- und Enddatum für die Buy-and-Hold-Strategie definieren
+# Define the start and end dates for the Buy-and-Hold strategy
 start_date <- "2022-01-01"
 end_date <- "2024-12-19"
 
-# Benchmark-Rendite für den SMI berechnen
+# Calculate the benchmark return for the SMI
 benchmark_results <- benchmark_smi(smi_data, smi_symbols, start_date, end_date)
 
-# Ergebnisse anzeigen
-print(benchmark_results$individual_returns)  # Individuelle Renditen der Aktien
-cat("Durchschnittliche Benchmark-Rendite (Buy-and-Hold):", benchmark_results$average_return, "\n")
-print(mean(benchmark_results$individual_returns))
+# Display results
+cat("Individual returns for SMI stocks:\n")
+print(benchmark_results$individual_returns)  # Individual returns of the stocks
+cat("\nAverage benchmark return (Buy-and-Hold):", benchmark_results$average_return, "\n")
+cat("\nAverage return of SMI stocks (overall):", mean(benchmark_results$individual_returns), "\n")
 
 ```
 
@@ -556,71 +680,75 @@ comparison_data <- data.frame(
   Return = c(cumulative_strategy_return, average_benchmark_return)
 )
 
-# Bar plot to compare the returns
+# Bar plot to compare the returns with a blue color theme
 ggplot(comparison_data, aes(x = Strategy, y = Return, fill = Strategy)) +
   geom_bar(stat = "identity", color = "black", alpha = 0.7) +
   labs(title = "Comparison of Trading Strategy vs Buy-and-Hold Benchmark",
        x = "Strategy", y = "Return") +
   scale_y_continuous(labels = scales::percent) +
-  theme_minimal()
-
+  scale_fill_manual(values = c("blue", "lightblue")) +  # Blue theme colors
+  theme_minimal() +
+  theme(legend.position = "none")  # Hide the legend
 ```
 
 ## **Performance Analysis: Trading Strategy vs Buy-and-Hold Benchmark**
 
-The results and visualization reveal a significant underperformance of the **trading strategy** compared to the **Buy-and-Hold benchmark**. Below is a detailed interpretation:
+The results and visualization clearly show that the **trading strategy** significantly underperformed the **Buy-and-Hold benchmark**. The following is a detailed analysis and interpretation:
 
 ---
 
 ### **1. Trading Strategy Performance**
 - **Cumulative Trading Strategy Return**: **-99.99%**
-   - This indicates that the trading strategy nearly wiped out the investment, leading to a catastrophic loss.
-   - A return of **-99.99%** means that the capital has almost completely eroded to **near-zero**.
+   - This indicates that the trading strategy almost completely wiped out the investment, leading to an extreme loss.
+   - A return of **-99.99%** implies that the capital has been almost entirely depleted, leaving very little value.
 
 ---
 
 ### **2. Buy-and-Hold Benchmark Performance**
 - **Average Benchmark Return**: **+9.67%**
-   - The **Buy-and-Hold strategy** generated a positive return of **9.67%** during the same period.
-   - This suggests that simply holding the SMI stocks throughout the time horizon would have yielded moderate gains.
+   - The **Buy-and-Hold strategy** generated a positive return of **9.67%** over the same period.
+   - This suggests that holding SMI stocks throughout the time horizon would have resulted in moderate but consistent gains, far outperforming the active strategy.
 
 ---
 
 ### **3. Key Insights**
-- The **trading strategy** drastically underperformed the benchmark.
-- A **-99.99% cumulative return** indicates severe issues with the strategy logic, such as:
-   - **Wrong timing** of entries and exits.
-   - Poor handling of significant price drops.
-   - The strategy may have flagged trades that consistently resulted in losses.
-- By contrast, the **Buy-and-Hold benchmark** showed resilience, suggesting that SMI stocks as a whole delivered stable returns.
+- The **trading strategy** suffered from significant underperformance compared to the Buy-and-Hold benchmark.
+- A **-99.99% cumulative return** points to fundamental issues with the strategy, possibly due to:
+   - **Ineffective timing** of entries and exits.
+   - **Inadequate management** of major price drops or trends.
+   - The strategy might have consistently flagged stocks that were on a downward trajectory, resulting in poor trade decisions.
+- In contrast, the **Buy-and-Hold benchmark** delivered steady returns, suggesting that a passive investment strategy in SMI stocks could have outperformed the active trading approach over the same period.
 
 ---
 
 ### **4. Potential Causes of the Strategy's Failure**
-To explain such severe underperformance:
-1. **Event Identification**: The threshold for significant price changes (e.g., -5%) may have resulted in frequent trades on stocks experiencing sustained declines, not recoveries.
-2. **Holding Period**: Holding the stocks for 30 days may not have been sufficient to capture recoveries, or prices may have continued to decline.
-3. **Execution Logic**: The logic for calculating buy and sell prices (e.g., lagged or adjusted values) may need verification.
-4. **Market Conditions**: A generally bearish market during the period may have compounded losses.
+The catastrophic underperformance of the strategy may be attributed to several factors:
+1. **Event Identification**: The threshold for significant price movements (e.g., -5%) might have led to frequent trades in stocks that were in a prolonged decline rather than capturing potential recoveries.
+2. **Holding Period**: A holding period of 30 days may not have been enough to realize gains from rebounds or recoveries, or the market conditions may have continued to decline during that period.
+3. **Execution Logic**: There may be flaws in the buy/sell price calculation, especially in how adjusted closing prices or lagged values were incorporated, which could have distorted the performance.
+4. **Market Conditions**: A generally bearish or volatile market during the evaluation period may have exacerbated losses, amplifying the underperformance of the strategy.
 
 ---
 
 ### **5. Recommendations**
-To address this:
+To improve the strategy's performance, several adjustments are recommended:
 1. **Refine the Strategy**:
-   - Reassess the event thresholds and entry rules.
-   - Extend or shorten the holding period based on market behavior.
-2. **Include Stop-Loss Logic**:
-   - Introduce mechanisms to limit losses when prices drop further after a trade is executed.
+   - Reevaluate the event thresholds for identifying significant price changes and adjust entry rules.
+   - Experiment with different holding periods based on broader market trends to better capture recoveries or market cycles.
+2. **Introduce Stop-Loss Logic**:
+   - Implement stop-loss mechanisms to mitigate losses in case of adverse market movements following trade execution.
 3. **Validate Data**:
-   - Ensure price and return calculations are accurate and free of NA values.
+   - Ensure that price and return calculations are accurate, free of missing values, and correctly reflect market conditions.
 4. **Backtest the Strategy**:
-   - Analyze the strategy over different periods or markets to check robustness.
+   - Test the strategy over different time periods and market conditions to assess its robustness and adaptability to various market environments.
 
 ---
 
 ### **Conclusion**
-The trading strategy's catastrophic performance highlights serious flaws in its design or execution. Meanwhile, the **Buy-and-Hold benchmark** suggests that a passive investment approach outperformed the active strategy. Revisions are needed to refine the strategy's logic and improve its performance.
+The severe underperformance of the trading strategy highlights the need for substantial refinements in its design or execution. Meanwhile, the **Buy-and-Hold benchmark** demonstrates that a passive investment strategy in SMI stocks outperformed the active approach. Revising the strategy’s logic and risk management is essential for improving its overall performance.
 
+---
 
-## GenAI Usage
+## **GenAI Usage**
+
+In developing and evaluating the trading strategy, **Generative AI (GenAI)** can be instrumental in improving the design and backtesting process. By leveraging AI models, we can automate the identification of optimal entry and exit points, conduct more accurate sentiment analysis, and even simulate different market scenarios to test the strategy's robustness. GenAI tools can also be used to enhance the event identification logic, optimize the holding periods, and suggest dynamic adjustments to risk management parameters. Furthermore, the integration of natural language processing (NLP) models can aid in analyzing market news and investor sentiment, providing additional insights to refine strategy decisions and predict market trends. With these advanced AI techniques, the strategy’s performance could be significantly improved, offering more consistent returns and better risk control.
