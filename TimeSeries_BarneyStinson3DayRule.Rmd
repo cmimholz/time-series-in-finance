@@ -108,9 +108,6 @@ download_data <- function(symbols, start_date = "2022-01-01", end_date = Sys.Dat
 
 # Download data
 smi_data <- download_data(smi_symbols)
-
-# Save the data to RDS for future use
-saveRDS(smi_data, file = "smi_stock_data.rds")
 ```
 
 ### **Inspect the Data**
@@ -130,11 +127,25 @@ To understand the behavior of stock prices, we decompose them into **trend**, **
 
 ```{r decomposition}
 # Function to decompose stock prices into trend, seasonality, and residuals
+
 decompose_stock <- function(stock_data, symbol) {
   adjusted_col <- paste0(symbol, ".Adjusted")
+  
+  # Check if the Adjusted column exists
   if (adjusted_col %in% colnames(stock_data)) {
-    ts_data <- ts(stock_data[, adjusted_col], frequency = 252) # Approx. 252 trading days per year
+    # Extract the Adjusted column and ensure it is numeric
+    adjusted_prices <- as.numeric(stock_data[, adjusted_col])
+    
+    # Check for NA values and remove them (required for stl)
+    adjusted_prices <- na.omit(adjusted_prices)
+    
+    # Create a time series object (frequency = 252 trading days/year)
+    ts_data <- ts(adjusted_prices, frequency = 252)
+    
+    # Apply STL decomposition
     decomposition <- stl(ts_data, s.window = "periodic")
+    
+    # Plot the decomposition
     plot(decomposition, main = paste("Decomposition for", symbol))
     return(decomposition)
   } else {
@@ -143,7 +154,8 @@ decompose_stock <- function(stock_data, symbol) {
 }
 
 # Decompose Nestlé stock data
-decompose_stock(smi_data[["NESN.SW"]], "NESN.SW")
+decomposition_nesn <- decompose_stock(smi_data[["NESN.SW"]], "NESN.SW")
+
 ```
 
 
@@ -240,11 +252,6 @@ implement_3_day_rule <- function(stock_data, symbol, threshold = -5, hold_days =
     cat("Adjusted price column not found for:", symbol, "\n")
   }
 }
-
-
-# Apply the strategy to Nestlé stock data
-strategy_nestle <- implement_3_day_rule(smi_data[["NESN.SW"]], "NESN.SW")
-head(strategy_nestle)
 ```
 
 ## **2. Results Interpretation**
@@ -389,7 +396,7 @@ plot_cumulative_returns(strategy_nestle, "NESN.SW")
 - **3-Day Rule**: The strategy calculates buy dates and evaluates holding period returns.
 - **Performance Metrics**: Include mean return, Sharpe ratio, and cumulative return visualization.
 
-##################- PIVOTANDO DE ESTRATEGIA #######################################
+##################- PIVOT DE ESTRATEGIA #######################################
 
 ##Recommendations for Next Steps
 1. Relax the Event Threshold
