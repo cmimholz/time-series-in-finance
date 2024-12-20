@@ -1,7 +1,7 @@
 ---
 title: "The Barney Stinson's 3-Day Rule Strategy"
 author: "Victor Anton, Imholz Chris"
-date: "19.12.2024"
+date: "20.12.2024"
 output:
   prettydoc::html_pretty:
     theme: hpstr
@@ -59,6 +59,24 @@ opts_chunk$set(
 ```
 
 <br>
+
+## **Introduction**
+
+In the world of stock trading, timing is everything—just like in dating. So, in true **Barney Stinson** fashion, we decided to test the legendary **3-Day Rule** on stocks, because if it works for love, why not try it for financial markets? According to **Barney**, you should wait three days before calling a girl. But what if you applied this rule to stocks? That’s exactly what we set out to find out!
+
+In this project, we borrowed from **Barney’s 3-Day Rule**—waiting three days after a significant price drop before making a move. Just like Barney would give a girl three days to call back, we waited three trading days to see if a stock could "call back" with a recovery. Of course, we added a twist: instead of relying on gut feelings, we introduced predictive models like **ARIMA** to try and forecast whether that stock would return our affection—or leave us high and dry.
+
+As we venture through this journey of "stock dating," we’ll explore whether the **3-Day Rule** can really lead to gains or if we’re just chasing after a market that’s playing hard to get. Spoiler alert: We may have had a few "bad dates" along the way, but who knows? With some fine-tuning, we might just find our perfect match.
+
+So, grab your suits, put on your best game face, and let’s dive into this adventure where **Barney’s Rule** meets financial forecasting—because in trading, like in love, it’s all about taking risks and waiting for the right moment.
+
+<br> 
+
+![](images/3day.jpg){width="4in"} 
+
+<br>
+
+---
 
 ## **Objective**
 
@@ -659,19 +677,24 @@ This section compares the **cumulative return** of the trading strategy to the *
 <summary>*Click to see results*</summary>
 
 ```{r benchmark, echo = FALSE, class.source = "fold-show"}
-# Cumulative return of the trading strategy
-cumulative_strategy_return <- prod(1 + returns, na.rm = TRUE) - 1  # Convert to percentage
-cat("Cumulative Trading Strategy Return:", cumulative_strategy_return * 100, "%\n")
-
 # Average return of the Buy-and-Hold benchmark (already calculated)
 average_benchmark_return <- benchmark_results$average_return
 cat("Average Benchmark (Buy-and-Hold) Return:", average_benchmark_return * 100, "%\n")
 
-# Comparison visualization
+# Average return of the trading strategy
+average_strategy_return <- mean(returns, na.rm = TRUE)  # Calculate average return
+cat("Average Trading Strategy Return:", average_strategy_return * 100, "%\n")
+
+# Cumulative return of the trading strategy
+cumulative_strategy_return <- prod(1 + returns, na.rm = TRUE) - 1  # Convert to percentage
+cat("Cumulative Trading Strategy Return:", cumulative_strategy_return * 100, "%\n")
+
+# Create a data frame for comparison of the three strategies
 comparison_data <- data.frame(
-  Strategy = c("Trading Strategy", "Buy-and-Hold Benchmark"),
-  Return = c(cumulative_strategy_return, average_benchmark_return)
+  Strategy = c("Buy-and-Hold Benchmark", "Trading Strategy"),
+  Return = c(average_benchmark_return, average_strategy_return)
 )
+
 ```
 
 </details>
@@ -679,15 +702,16 @@ comparison_data <- data.frame(
 <br>
 
 ```{r benchmark_plot, echo = FALSE}  
-# Bar plot to compare the returns with a blue color theme
+# Bar plot to compare the returns of the three strategies with a custom color theme
 ggplot(comparison_data, aes(x = Strategy, y = Return, fill = Strategy)) +
   geom_bar(stat = "identity", color = "black", alpha = 0.7) +
   labs(title = "Comparison of Trading Strategy vs Buy-and-Hold Benchmark",
        x = "Strategy", y = "Return") +
   scale_y_continuous(labels = scales::percent) +
-  scale_fill_manual(values = c("blue", "lightblue")) +  # Blue theme colors
+  scale_fill_manual(values = c("green", "red")) +  # Green for Buy-and-Hold, Red for Trading and ARIMA Strategy
   theme_minimal() +
   theme(legend.position = "none")  # Hide the legend
+
 ```
 
 ### **Performance Analysis: Trading Strategy vs Buy-and-Hold Benchmark**
@@ -866,12 +890,11 @@ plot_arima_until_date <- function(stock_data, symbol, date_x, periods = 90) {
   }
 }
 
-# Set up a 2x4 grid of plots
-par(mfrow = c(2, 4), mar = c(4, 4, 3, 1))  # Adjust margins if needed for better readability
+# Set up a 2x2 grid of plots (4 plots, 2 per row)
+par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))  # Adjust margins for better readability
 
 # Plot ARIMA forecasts for each of the given dates with more days and shaded confidence intervals
-dates <- c("2022-02-24", "2022-03-01", "2022-03-04", "2022-06-16", 
-           "2022-07-26", "2023-03-13", "2023-03-15", "2024-08-02")
+dates <- c("2022-02-24", "2022-03-01", "2022-03-04", "2022-06-16")
 
 # Loop through each date and plot
 for (date in dates) {
@@ -880,6 +903,21 @@ for (date in dates) {
 
 
 ```
+
+```{r arima_2, echo = FALSE}
+# Set up a 2x2 grid of plots (4 plots, 2 per row)
+par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))  # Adjust margins for better readability
+
+# Plot ARIMA forecasts for each of the given dates with more days and shaded confidence intervals
+dates <- c("2022-07-26", "2023-03-13", "2023-03-15", "2024-08-02")
+
+# Loop through each date and plot
+for (date in dates) {
+  plot_arima_until_date(smi_with_events, "UBSG.SW", date)
+}
+
+```
+
 
 #### **Interpretation**
 
@@ -1245,15 +1283,22 @@ However, the performance of both the **Trading Strategy** and **ARIMA Strategy**
 - The **Trading Strategy** resulted in an average return of **-5.87%**, with a cumulative return of **-99.99%**, indicating significant losses during the period.
 - The **ARIMA Strategy** showed slightly better results with an average return of **-14.23%** and a cumulative return of **-62.48%**, but it still underperformed relative to the **SMI Benchmark**.
 
-### **Key Insights:**
-1. The **SMI (Buy-and-Hold)** strategy outperformed both active strategies, suggesting that in certain market conditions, a passive investment strategy may be more effective than attempting to time the market.
-2. Both the **Trading Strategy** and **ARIMA Strategy** produced negative returns, with the Trading Strategy performing significantly worse. This highlights that short-term, reactive strategies may not capture the underlying market trends effectively.
-3. The **ARIMA model**, while a sophisticated forecasting tool, did not provide the accuracy needed to generate consistent profits. This reinforces the notion that stock price forecasting is inherently uncertain, and simpler rules may sometimes outperform complex models.
-4. Both strategies require further refinement. The current approaches, which are based on fixed thresholds and short-term reactive decisions, may benefit from a more dynamic, data-driven approach.
+### **Key Insights**
+1. The **SMI (Buy-and-Hold)** strategy outperformed both active strategies, suggesting that a passive approach may be more effective in certain market conditions than attempting to time the market.
 
-### **Next Steps:**
+2. Both the **Trading Strategy** and **ARIMA Strategy** yielded negative returns, with the Trading Strategy underperforming significantly. This suggests that short-term, reactive strategies may struggle to capture broader market trends.
+
+3. The **ARIMA model**, though sophisticated, lacked the accuracy needed for consistent profits, reinforcing the idea that stock price forecasting is uncertain and simpler strategies may sometimes perform better.
+
+4. Both strategies need refinement. Current approaches based on fixed thresholds and short-term decisions could benefit from a more dynamic, data-driven approach.
+
+
+### **Next Steps**
+
 - **Refinement of Active Strategies**: Both **Trading** and **ARIMA strategies** need optimization, including adjusting entry/exit points, time horizons, and thresholds for better market responsiveness.
+
 - **Risk Management**: Incorporating tools like **stop-loss orders** can help mitigate losses during market volatility, preserving capital.
+
 - **Exploration of Alternative Models**: Using advanced techniques like **Random Forests**, **Gradient Boosting**, or **LSTM** could enhance predictive accuracy by identifying complex data patterns that simpler models might miss.
 
 In conclusion, while **Barney's 3-Day Rule** might be useful in some contexts, our analysis suggests that **a more thoughtful, data-driven approach** may be needed in the realm of stock trading. Long-term strategies with better risk management could provide more stable returns, while the active strategies would benefit from a more refined and evidence-based approach.
@@ -1262,9 +1307,23 @@ As with life, not every investment is a quick win. **Maybe a stock, like a perso
 
 Let’s keep refining the strategy, try out different models, and who knows? Maybe next time we’ll make better choices, both with stocks and in life.
 
+
 ---
 
-## **GenAI Usage**
+## **Usage of Gen AI in the Project**
 
-In developing and evaluating the trading strategy, **Generative AI (GenAI)** can be instrumental in improving the design and backtesting process. By leveraging AI models, we can automate the identification of optimal entry and exit points, conduct more accurate sentiment analysis, and even simulate different market scenarios to test the strategy's robustness. GenAI tools can also be used to enhance the event identification logic, optimize the holding periods, and suggest dynamic adjustments to risk management parameters. Furthermore, the integration of natural language processing (NLP) models can aid in analyzing market news and investor sentiment, providing additional insights to refine strategy decisions and predict market trends. With these advanced AI techniques, the strategy’s performance could be significantly improved, offering more consistent returns and better risk control.
+Throughout this project, **Gen AI** played a crucial role in improving our analysis and decision-making for the strategy. It assisted in the development of forecasting models by suggesting improvements to existing algorithms, particularly in identifying and refining entry points for both the **Trading Strategy** and **ARIMA Strategy**. Gen AI also provided valuable insights into alternative strategies, offering recommendations on more advanced techniques, such as **Random Forest** and **LSTM**, which could potentially improve prediction accuracy, but where out of scope.
+
+Moreover, **Gen AI** was used to optimize code and streamline the process of backtesting strategies, saving significant time and effort.
+
+**THANK YOU!**
+
+<br> 
+
+![](images/wink.jpg){width="4in"} 
+
+<br>
+
+
+
 
