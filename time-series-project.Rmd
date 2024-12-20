@@ -34,7 +34,17 @@ table {
   font-size: 16px;
   line-height: 0.8;
 }
+
+/* Add this part to target bullet points and make them smaller */
+ul, ol {
+  font-size: 14px; /* Smaller font size for list items */
+}
+
+li {
+  font-size: 14px; /* Smaller font size for list items */
+}
 </style>
+
 
 ```
 
@@ -54,45 +64,20 @@ opts_chunk$set(
 
 The purpose of this report is to design and evaluate a robust **trading strategy** for stocks listed in the **Swiss Market Index (SMI)** using the **3-Day Rule**. The strategy consists of:
 
-1. **Identifying Significant Price Drops**: Recognize stock price drops of ≥ 5%.
-2. **3-Day Rule Execution**: Buy the stock 3 days after the significant drop.
-3. **Performance Evaluation**: Assess the strategy based on:
-   - Returns
-   - Sharpe Ratio
-   - Cumulative Returns
-4. **Exploration of Alternative Strategies**: Implement and compare methods like Mean Reversion and Trend-Following.
+- **Identifying Significant Price Drops**: Recognize stock price drops of ≥ 5%.
 
-1. Identifies significant price drops (≥ 5%).
-2. Implements the 3-day rule for buying stocks after such events.
-3. Evaluates the performance of the strategy using returns, Sharpe Ratio, and cumulative returns.
-4. Enhances analysis with time series decomposition and ARIMA modeling.
+- **3-Day Rule Execution**: Buy the stock 3 days after the significant drop.
+
+- **Performance Evaluation**: Assess the strategy based on: Returns, Sharpe Ratio & Cumulative Returns.
+
+- **Exploration of Alternative Strategies**: Implement and compare methods like Mean Reversion and Trend-Following.
+
+Since we are conducting this analysis for 20 stocks, we will specifically focus on the **UBS stock** for this section of the analysis.
 
 ---
 
-## **Structure**
-
-### **1. Identification Phase**
-- **Visualizing Data**: Using plots to understand stock trends.
-- **Preparing Data**: Cleaning and calculating key metrics like percentage price changes.
-- **Decomposition**: Splitting stock prices into trend, seasonality, and residuals.
-- **Statistical Analysis**: Examining central moments and relationships among variables.
-
-### **2. Estimation Phase**
-- **ARIMA Forecasting**: Specifying and estimating time series models.
-
-### **3. Diagnostic Phase**
-- **Performance Checks**: Evaluating the model’s accuracy and results using:
-  - Returns, Success Rates, and Sharpe Ratios.
-  - Backtesting on alternative strategies.
-
-### **4. Operational Phase**
-- **Execution and Reporting**: Forecasting future price trends and implementing the trading strategy.
-
----
-
-## **1. Data Preparation**
+## **Data Preparation**
 ### **Load Required Libraries**
-## Libraries
 
 In this report the following libraries are used.
 
@@ -107,10 +92,13 @@ if (!require("ggplot2")) install.packages("ggplot2")
 if (!require("forecast")) install.packages("forecast")
 if (!require("TTR")) install.packages("TTR")
 
+
 library(quantmod)
 library(dplyr)
 library(forecast)
 library(TTR)
+library(knitr)
+opts_chunk$set(echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE)
 ```
 
 </details>
@@ -133,9 +121,11 @@ The following column names appear in the downloaded data. `[SYMBOL]` represents 
 
 This section outlines the process of retrieving historical stock price data for companies listed in the Swiss Market Index (SMI) and the S&P 500 index. It specifies the relevant stock symbols and employs a custom function to download the data from Yahoo Finance. The function also includes error handling to manage any issues during the download process. Once the data is downloaded, it is saved as an RDS file to ensure efficient future access and prevent redundant downloads.
 
+<details>
 
-```{r shares_download, echo=FALSE, warning = FALSE, fig.width=10}
+<summary>*Click to see data for UBS*</summary>
 
+```{r shares_download, echo=FALSE, message=FALSE, warning=FALSE, class.source = "fold-show"}
 # Define a list of stock symbols for the Swiss Market Index (SMI). 
 # These symbols represent the 20 largest publicly traded companies in Switzerland.
 smi_symbols <- c(
@@ -145,14 +135,8 @@ smi_symbols <- c(
   "SREN.SW", "SCMN.SW", "UHR.SW", "UBSG.SW", "ZURN.SW"
 )
 
-
-# Retrieve the list of symbols for companies in the S&P 500 index.
-# The tq_index function fetches up-to-date information on all S&P 500 components.
-# sp500 <- tq_index("SP500")
-# head(sp500)
-
 # Function to download historical stock price data for a given list of symbols.
-download_data <- function(symbols, start_date = "2022-01-01",end_date = Sys.Date()) {
+download_data <- function(symbols, start_date = "2022-01-01", end_date = Sys.Date()) {
   stock_data <- list()
   for (symbol in symbols) {
     tryCatch({
@@ -160,23 +144,26 @@ download_data <- function(symbols, start_date = "2022-01-01",end_date = Sys.Date
                                          from = start_date, 
                                          to = end_date, 
                                          auto.assign = FALSE)
-      cat("Downloaded data for:", symbol, "\n")
+      # Commented out the print statement to suppress output
+      # cat("Downloaded data for:", symbol, "\n")
     }, error = function(e) {
-      cat("Error downloading data for:", symbol, "\n")
+      # Commented out the error message to suppress output
+      # cat("Error downloading data for:", symbol, "\n")
     })
   }
   return(stock_data)
 }
 
-# Use the download_data function to retrieve historical stock data for all SMI symbols.
+# Retrieve stock data
 smi_data <- download_data(smi_symbols)
-#s_p_data <- download_data(sp500$symbol)
 
-# Save the downloaded SMI stock data as an RDS file.
-#saveRDS(smi_data, file = "smi_stock_data.rds")
-#saveRDS(s_p_data, file = "s_p_stock_data.rds")
-
+# Print the first 100 rows of UBSG.SW data
+head(smi_data[["UBSG.SW"]], 5)
 ```
+
+</details>
+
+<br>
 
 ### **Visualizing Adjusted Stock Prices Over Time**
 
@@ -184,7 +171,7 @@ This section introduces a function for visualizing the adjusted stock prices of 
 
 In this example, we plot the UBS stock prices.
 
-```{r ubs_stock_plot, echo=FALSE, warning = FALSE, fig.width=10}
+```{r ubs_stock_plot, echo=FALSE, warning = FALSE}
 
 
 # Define a custom function `plot_stock` to visualize the adjusted closing prices of a stock.
@@ -275,46 +262,40 @@ head(smi_percent_diff[["UBSG.SW"]])
 
 <br>
 
+---
 
-
-### Implementation of the Strategy
+## **Implementation of the Strategy**
 
 The strategy is implemented in several steps to identify and act on
 significant stock price movements systematically:
 
-1.  **Identification of Events**: Significant events are identified as
-    price changes of 5% or more in the adjusted closing price.
-2.  **Stock Purchase**: Stocks are purchased three trading days after a
-    significant event to mitigate overreaction.
-3.  **Holding Period**: The stocks are held for 30 trading days,
-    allowing for potential recovery.
-4.  **Return Calculation**: Returns are calculated based on the buy
-    price and the sell price after 30 days.
+**1.  Identification of Events**: Significant events are identified as price changes of 5% or more in the adjusted closing price.
+
+**2.  Stock Purchase**: Stocks are purchased three trading days after a significant event to mitigate overreaction.
+
+**3.  Holding Period**: The stocks are held for 30 trading days, allowing for potential recovery.
+
+**4.  Return Calculation**: Returns are calculated based on the buy price and the sell price after 30 days.
 
 Each step is supported by specific code implementations, which are
 detailed below.
 
-1.  **Identifying Events with ≥ 5% Price Changes**\
-    Significant price movements, defined as changes of 5% or more in the
-    adjusted closing price, are critical for triggering trading actions.
-    To identify such events, we calculate the daily percentage change
-    for each stock using the adjusted closing prices. The percentage
-    change is computed using the formula:
+### **Identifying Events with ≥ 5% Price Changes**
+
+Significant price movements, defined as changes of 5% or more in the adjusted closing price, are critical for triggering trading actions.
+To identify such events, we calculate the daily percentage change for each stock using the adjusted closing prices. The percentage change is computed using the formula:
 
 $$
   \text{Percentage Change} = \left(\frac{\text{Current Price}}{\text{Previous Price}} - 1\right) \times 100
 $$
 
-    This calculation is applied across all stocks in the dataset, and
-    the results are stored in a new column, `[SYMBOL].Percent_Diff`. A
-    threshold filter is then applied to flag events where the percentage
-    change is lower or equal to -5%.
+This calculation is applied across all stocks in the dataset, and the results are stored in a new column, `[SYMBOL].Percent_Diff`. A threshold filter is then applied to flag events where the percentage change is lower or equal to -5%.
 
 <details>
 
 <summary>*Click to see all identified events for UBS*</summary>
 
-```{r event_identification, class.source = "fold-show"}
+```{r event_identification, echo=FALSE, class.source = "fold-show"}
 # 1. Identifying Events with ≥ 5% Price Change.
 identify_events <- function(stock_data, symbol, threshold) {
   if (!is.null(stock_data[[symbol]])) {
@@ -344,44 +325,38 @@ for (i in seq_along(smi_percent_diff)) {
                                                threshold = -5.0)
 }
 
-head(smi_with_events[["UBSG.SW"]], 100)
-
-
+# Subset the DataFrame to show only the three specified columns
+head(smi_with_events[["UBSG.SW"]][, c("UBSG.SW.Adjusted", "UBSG.SW.Percent_Diff", "Event")], 100)
 ```
 
-</details>
 
-<br>
-
-
-#### 2. Buying the Stock 3 Days After the Event
+### **Buying the Stock 3 Days After the Even**
 
 To mitigate market overreaction and ensure a more stable entry point, the strategy specifies buying the stock three trading days after the identified event. This delay allows the market to stabilize and provides an opportunity to enter at a more predictable price level. The corresponding buy date is calculated for each flagged event.
 
 <details>
 
-<summary>*Click to see all libraries*</summary>
+<summary>*Click to see buy dates*</summary>
 
-```{r buy_3_days_later, class.source = "fold-show"}
-#library(dplyr)  # Lade dplyr für if_else
-# Funktion zum Hinzufügen des Kaufdatums (3. Handelsdatum nach Event)
+```{r buy_3_days_later, echo=FALSE ,class.source = "fold-show"}
+# Function to add the purchase date (3rd trading day after the event)
 add_buy_dates <- function(stock_data, symbol) {
   if (!is.null(stock_data[[symbol]])) {
     stock_data[[symbol]] <- as.data.frame(stock_data[[symbol]])
     
-    # TODO : braucht es eventuell nicht mehr
-    # Konvertiere den Index in ein Date-Objekt und speichere es als Event_Date
+    # TODO: This may not be needed anymore
+    # Convert the index to a Date object and store it as Event_Date
     stock_data[[symbol]]$Event_Date <- as.Date(row.names(stock_data[[symbol]]))
     
-    # Initialisiere Buy_Date mit NA
+    # Initialize Buy_Date with NA
     stock_data[[symbol]]$Buy_Date <- as.Date(NA)
     
-    # Berechne das 3. Handelsdatum nach dem Event
+    # Calculate the 3rd trading day after the event
     for (i in which(stock_data[[symbol]]$Event)) {
       current_index <- i
-      future_index <- current_index + 3  # Das 3. Handelsdatum (Index-basiert)
+      future_index <- current_index + 3  # The 3rd trading day (index-based)
       
-      # Prüfe, ob der zukünftige Index innerhalb der DataFrame-Grenzen liegt
+      # Check if the future index is within the DataFrame limits
       if (future_index <= nrow(stock_data[[symbol]])) {
         stock_data[[symbol]]$Buy_Date[current_index] <- stock_data[[symbol]]$Event_Date[future_index]
       }
@@ -394,16 +369,17 @@ add_buy_dates <- function(stock_data, symbol) {
   }
 }
 
-# For-Loop, um Kaufdaten und Ereignisdatum hinzuzufügen
+# For-loop to add purchase dates and event dates
 smi_with_buy_dates <- list()
 
 for (i in seq_along(smi_with_events)) {
-  symbol <- smi_symbols[i]  # Das aktuelle Symbol
+  symbol <- smi_symbols[i]  # The current symbol
   smi_with_buy_dates[[symbol]] <- add_buy_dates(stock_data = smi_with_events, symbol = symbol)
 }
 
-# Beispiel: UBSG.SW anzeigen
-head(smi_with_buy_dates[["UBSG.SW"]][, c("Event_Date", "Buy_Date", "Event")], 1000)
+# Example: Show UBSG.SW
+head(smi_with_buy_dates[["UBSG.SW"]], 100)
+
 ```
 
 </details>
@@ -411,7 +387,7 @@ head(smi_with_buy_dates[["UBSG.SW"]][, c("Event_Date", "Buy_Date", "Event")], 10
 <br>
 
 
-#### 3. Holding the Stock for 30 Days
+### **Holding the Stock for 30 Days**
 
 After the stock is purchased, it is held for a fixed period of 30 trading days. This duration is chosen based on the hypothesis that prices will recover following the initial overreaction, allowing for potential capital appreciation during this window.
 
@@ -432,28 +408,28 @@ These returns are stored for analysis and aggregated to assess the overall profi
 
 <details>
 
-<summary>*Click to see all libraries*</summary>
+<summary>*Click to see holding periods*</summary>
 
-```{r holding_period, class.source = "fold-show"}
-# Funktion zur Berechnung der Renditen
+```{r holding_period_1, ECHO=FALSE, class.source = "fold-show"}
+# Function to calculate returns
 calculate_returns <- function(stock_data, symbol) {
   if (!is.null(stock_data[[symbol]])) {
     stock_data[[symbol]] <- as.data.frame(stock_data[[symbol]])
-    adjusted_col <- paste0(symbol, ".Adjusted")  # Angepasster Schlusskurs
+    adjusted_col <- paste0(symbol, ".Adjusted")  # Adjusted close price
 
     if (adjusted_col %in% colnames(stock_data[[symbol]])) {
-      # Rendite berechnen
+      # Calculate return
       stock_data[[symbol]]$Return <- ifelse(
-        !is.na(stock_data[[symbol]]$Buy_Date),  # Wenn ein Kaufdatum existiert
+        !is.na(stock_data[[symbol]]$Buy_Date),  # If a buy date exists
         {
-          # Kaufpreis (Schlusskurs am Buy_Date)
+          # Purchase price (close price at Buy_Date)
           buy_price <- lag(stock_data[[symbol]][, adjusted_col], 3)
-          # Verkaufspreis (Schlusskurs nach 30 Tagen)
+          # Selling price (close price after 30 days)
           sell_price <- lead(stock_data[[symbol]][, adjusted_col], 30)
-          # Rendite berechnen
+          # Calculate return
           (sell_price - buy_price) / buy_price
         },
-        NA  # Keine Rendite, wenn kein Kaufdatum vorhanden ist
+        NA  # No return if no buy date exists
       )
       return(stock_data[[symbol]])
     } else {
@@ -466,15 +442,15 @@ calculate_returns <- function(stock_data, symbol) {
   }
 }
 
-# For-Loop, um Renditen für jedes Symbol zu berechnen
+# For-loop to calculate returns for each symbol
 smi_with_returns <- list()
 
 for (i in seq_along(smi_with_buy_dates)) {
-  symbol <- smi_symbols[i]  # Das aktuelle Symbol
+  symbol <- smi_symbols[i]  # The current symbol
   smi_with_returns[[symbol]] <- calculate_returns(stock_data = smi_with_buy_dates, symbol = symbol)
 }
 
-head(smi_with_returns[["UBSG.SW"]],1000)
+head(smi_with_returns[["UBSG.SW"]], 100)
 ```
 
 </details>
@@ -482,7 +458,7 @@ head(smi_with_returns[["UBSG.SW"]],1000)
 <br>
 
 
-#### 4. Summary of the Results
+### **Summary of the Results**
 
 The performance of the strategy is quantified using several key metrics:
 
@@ -497,8 +473,6 @@ These metrics are calculated using the following dataset, which includes event d
 | Event_Date | Buy_Date   | Return     |
 |------------|------------|------------|
 | 2022-01-03 | 2022-01-03 | <NA>       |
-| 2022-01-04 | 2022-01-04 | <NA>       |
-| 2022-01-05 | 2022-01-05 | <NA>       |
 | ...        | ...        | ...        |
 | 2022-02-24 | 2022-02-24 | -0.0597    |
 | 2022-03-01 | 2022-03-01 |  0.0585    |
@@ -507,7 +481,13 @@ These metrics are calculated using the following dataset, which includes event d
 
 The returns are calculated by comparing the buy and sell prices, with the strategy's overall performance aggregated to assess profitability.
 
-```{r calculate_returns, echo = FALSE, fig.width=10}
+With an **average of return** of **-0.06** and a **total return** of **-7.98**.
+
+<details>
+
+<summary>*Click to see summary results*</summary>
+
+```{r summarize_results, echo = FALSE, class.source = "fold-show"}
 # Function to summarize the results and extract returns
 summarize_results <- function(stock_data) {
   # Extract all returns from the list
@@ -545,16 +525,21 @@ results_summary <- summarize_results(smi_with_returns)
 print(results_summary)
 ```
 
-### 2. **Visualization of Strategy Performance**
+</details>
+
+<br>
+
+### **Visualization of Strategy Performance**
+
 This section focuses on visualizing the returns generated by the implemented strategy to gain insights into its performance. Two key visualizations are included:
 
 
-**a) Distribution of Returns**
-Objective:
+#### **Distribution of Returns**
+
 The histogram shows the frequency of positive and negative returns, providing a clear overview of the return distribution. This helps identify whether the strategy generates more positive or negative returns and highlights the variability of returns.
 
 
-```{r Distribution of Returns, echo = TRUE, fig.width=10}
+```{r Distribution of Returns 1, echo = FALSE}
 ggplot(data = data.frame(Return = returns), aes(x = Return)) +
   geom_histogram(binwidth = 0.01, fill = "blue", color = "white") +
   labs(title = "Distribution of Returns", x = "Return", y = "Frequency") + 
@@ -562,12 +547,12 @@ ggplot(data = data.frame(Return = returns), aes(x = Return)) +
 
 ```
 
-**b) Returns Over Time**
-Objective:
-The scatterplot shows how returns evolve over time, highlighting any trends, clusters, or patterns in the strategy’s performance.
+#### **Returns Over Time**
+
+The scatter plot shows how returns evolve over time, highlighting any trends, clusters, or patterns in the strategy’s performance.
 
 
-```{r visualize_returns, echo = TRUE, fig.width=10}
+```{r visualize_returns, echo = FALSE}
 # Combine all data frames into a single DataFrame and retain only valid rows
 all_returns <- do.call(rbind, lapply(smi_with_returns, function(df) {
   if (!is.null(df$Buy_Date) & !is.null(df$Return)) {
@@ -584,12 +569,12 @@ all_returns$Buy_Date <- as.Date(all_returns$Buy_Date)
 # Scatterplot of returns over time with color-coded points in a blue scale
 ggplot(data = all_returns, aes(x = Buy_Date, y = Return, color = Return)) +
   geom_point(alpha = 0.7) +  # Semi-transparent points for better visibility
-  scale_color_gradient2(low = "lightblue", mid = "blue", high = "darkblue", midpoint = 0) +  # Blue scale
+  scale_color_gradient2(low = "red", mid = "yellow", high = "green", midpoint = 0) +  # Blue scale
   labs(title = "Returns Over Time", x = "Buy Date", y = "Return") +
   theme_minimal()            # Apply a clean, minimal theme
 ```
 
-### **Implementation and Benchmarking of the Buy-and-Hold Strategy**
+#### **Implementation and Benchmarking of the Buy-and-Hold Strategy**
 
 This section focuses on implementing the **Buy-and-Hold strategy** as a benchmark for evaluating the trading strategy. For each stock in the SMI, the strategy calculates the return by comparing the adjusted closing price at the start date to the adjusted closing price at the end date. The returns are averaged across all stocks to provide an overall benchmark return.
 
@@ -597,9 +582,11 @@ It is important to note that the average return calculated here is **not weighte
 
 The Buy-and-Hold approach assumes no active trading decisions, offering a simple and passive investment strategy. By comparing this benchmark to the cumulative return of the trading strategy, we can assess whether active trading outperforms or underperforms a passive investment approach.
 
+<details>
 
-```{r benchmark_buy_and_hold, echo = TRUE, fig.width=10}
+<summary>*Click to see results*</summary>
 
+```{r benchmark_buy_and_hold, echo = FALSE, class.source = "fold-show"}
 # Function to implement the Buy-and-Hold strategy
 buy_and_hold_strategy <- function(stock_data, symbol, start_date, end_date) {
   if (!is.null(stock_data[[symbol]])) {
@@ -657,15 +644,21 @@ cat("Individual returns for SMI stocks:\n")
 print(benchmark_results$individual_returns)  # Individual returns of the stocks
 cat("\nAverage benchmark return (Buy-and-Hold):", benchmark_results$average_return, "\n")
 cat("\nAverage return of SMI stocks (overall):", mean(benchmark_results$individual_returns), "\n")
-
 ```
 
-### **Benchmark Comparison**
+</details>
+
+<br>
+
+#### **Benchmark Comparison**
 
 This section compares the **cumulative return** of the trading strategy to the **average Buy-and-Hold benchmark**. A bar chart visualizes the performance difference, highlighting the strategy's effectiveness against a passive investment approach.
 
+<details>
 
-```{r benchmark, echo = TRUE, fig.width=10}  
+<summary>*Click to see results*</summary>
+
+```{r benchmark, echo = FALSE, class.source = "fold-show"}
 # Cumulative return of the trading strategy
 cumulative_strategy_return <- prod(1 + returns, na.rm = TRUE) - 1  # Convert to percentage
 cat("Cumulative Trading Strategy Return:", cumulative_strategy_return * 100, "%\n")
@@ -679,7 +672,13 @@ comparison_data <- data.frame(
   Strategy = c("Trading Strategy", "Buy-and-Hold Benchmark"),
   Return = c(cumulative_strategy_return, average_benchmark_return)
 )
+```
 
+</details>
+
+<br>
+
+```{r benchmark_plot, echo = FALSE}  
 # Bar plot to compare the returns with a blue color theme
 ggplot(comparison_data, aes(x = Strategy, y = Return, fill = Strategy)) +
   geom_bar(stat = "identity", color = "black", alpha = 0.7) +
@@ -691,27 +690,21 @@ ggplot(comparison_data, aes(x = Strategy, y = Return, fill = Strategy)) +
   theme(legend.position = "none")  # Hide the legend
 ```
 
-## **Performance Analysis: Trading Strategy vs Buy-and-Hold Benchmark**
+### **Performance Analysis: Trading Strategy vs Buy-and-Hold Benchmark**
 
 The results and visualization clearly show that the **trading strategy** significantly underperformed the **Buy-and-Hold benchmark**. The following is a detailed analysis and interpretation:
 
----
-
-### **1. Trading Strategy Performance**
+#### **Trading Strategy Performance**
 - **Cumulative Trading Strategy Return**: **-99.99%**
    - This indicates that the trading strategy almost completely wiped out the investment, leading to an extreme loss.
    - A return of **-99.99%** implies that the capital has been almost entirely depleted, leaving very little value.
 
----
-
-### **2. Buy-and-Hold Benchmark Performance**
+#### **Buy-and-Hold Benchmark Performance**
 - **Average Benchmark Return**: **+9.67%**
    - The **Buy-and-Hold strategy** generated a positive return of **9.67%** over the same period.
    - This suggests that holding SMI stocks throughout the time horizon would have resulted in moderate but consistent gains, far outperforming the active strategy.
 
----
-
-### **3. Key Insights**
+#### **Key Insights**
 - The **trading strategy** suffered from significant underperformance compared to the Buy-and-Hold benchmark.
 - A **-99.99% cumulative return** points to fundamental issues with the strategy, possibly due to:
    - **Ineffective timing** of entries and exits.
@@ -719,9 +712,7 @@ The results and visualization clearly show that the **trading strategy** signifi
    - The strategy might have consistently flagged stocks that were on a downward trajectory, resulting in poor trade decisions.
 - In contrast, the **Buy-and-Hold benchmark** delivered steady returns, suggesting that a passive investment strategy in SMI stocks could have outperformed the active trading approach over the same period.
 
----
-
-### **4. Potential Causes of the Strategy's Failure**
+#### **Potential Causes of the Strategy's Failure**
 The catastrophic underperformance of the strategy may be attributed to several factors:
 1. **Event Identification**: The threshold for significant price movements (e.g., -5%) might have led to frequent trades in stocks that were in a prolonged decline rather than capturing potential recoveries.
 2. **Holding Period**: A holding period of 30 days may not have been enough to realize gains from rebounds or recoveries, or the market conditions may have continued to decline during that period.
@@ -730,25 +721,550 @@ The catastrophic underperformance of the strategy may be attributed to several f
 
 ---
 
-### **5. Recommendations**
-To improve the strategy's performance, several adjustments are recommended:
-1. **Refine the Strategy**:
-   - Reevaluate the event thresholds for identifying significant price changes and adjust entry rules.
-   - Experiment with different holding periods based on broader market trends to better capture recoveries or market cycles.
-2. **Introduce Stop-Loss Logic**:
-   - Implement stop-loss mechanisms to mitigate losses in case of adverse market movements following trade execution.
-3. **Validate Data**:
-   - Ensure that price and return calculations are accurate, free of missing values, and correctly reflect market conditions.
-4. **Backtest the Strategy**:
-   - Test the strategy over different time periods and market conditions to assess its robustness and adaptability to various market environments.
+## **Re-implementation of the Trading Strategy with ARIMA**
+
+**Recommendations for Improvement**
+
+To improve the trading strategy’s performance:
+
+1. **Refine the Strategy**: 
+   - Adjust thresholds for significant price drops and entry rules based on market trends. 
+   - Experiment with different holding periods.
+
+2. **Introduce Stop-Loss Logic**: 
+   - Implement stop-loss mechanisms to manage risk and prevent large losses.
+
+3. **Validate Data**: 
+   - Ensure data accuracy and correct reflection of market conditions.
+
+4. **Backtest the Strategy**: 
+   - Test across various time periods and market conditions to assess robustness.
+
+**Incorporating ARIMA into the Strategy**
+
+To enhance the **3-Day Rule** strategy:
+
+- After identifying a significant drop (≥ 5%), instead of buying immediately, we use the **ARIMA model** to predict future price movements.
+- If ARIMA predicts a price increase with high confidence (e.g., 60-70%), we proceed with the purchase.
+- We may also explore other models like **Random Forest** or **LSTM** for predictions.
+
+**Real-Time Forecasting on the Day of the Event**
+
+- On the day of the event, the ARIMA model will be used to forecast stock movement and decide whether to buy, improving timing and decision-making.
+
+By integrating **ARIMA forecasting**, we aim to improve the accuracy of buy decisions and enhance overall strategy performance.
+
+
+### **Start of Implementation: Identifying True Events where a -5% Downturn is Identified**
+
+We identify potential buying opportunities following a market correction of at least -5%.
+
+```{r event_identification_arima, echo = FALSE}
+# 1. Identifying Events with ≥ 5% Price Change.
+identify_events <- function(stock_data, symbol, threshold) {
+  if (!is.null(stock_data[[symbol]])) {
+    percent_diff_col <- paste0(symbol, ".Percent_Diff")
+    if (percent_diff_col %in% colnames(stock_data[[symbol]])) {
+      stock_data[[symbol]] <- as.data.frame(stock_data[[symbol]])
+      stock_data[[symbol]]$Event <- stock_data[[symbol]][, percent_diff_col] < threshold
+      return(stock_data[[symbol]])
+    } else {
+      cat("Percent diff column not found for:", symbol, "\n")
+      return(NULL)
+    }
+  } else {
+    cat("No data available for:", symbol, "\n")
+    return(NULL)
+  }
+}
+
+# Initialize an empty list to store results
+smi_with_events <- list()
+
+# For loop to identify events
+for (i in seq_along(smi_percent_diff)) {
+  symbol <- smi_symbols[i]  # Current symbol
+  smi_with_events[[symbol]] <- identify_events(stock_data = smi_percent_diff, 
+                                               symbol = symbol, 
+                                               threshold = -5.0)
+}
+```
+
+<details>
+
+<summary>*Click to see true events for UBS*</summary>
+
+```{r true_events_ubs, echo=FALSE , class.source = "fold-show"}
+# Filter rows where Event is TRUE
+true_events_df <- smi_with_events[["UBSG.SW"]][smi_with_events[["UBSG.SW"]]$Event == TRUE, ]
+
+# Extract the dates for the events
+event_dates <- rownames(true_events_df)
+
+# Print out the event dates
+print(event_dates)
+```
+
+</details>
+
+<br>
+
+### **ARIMA Forecasting for a Specific Date**
+
+Next, we use the ARIMA model to forecast future stock prices starting from a specific date. The forecast includes the predicted prices and the confidence intervals for future values.
+
+```{r arima, echo = FALSE}
+# Function to plot ARIMA forecast with extended prediction and thinner historical line
+plot_arima_until_date <- function(stock_data, symbol, date_x, periods = 90) {
+  # Convert date_x to Date format
+  date_x <- as.Date(date_x)
+  
+  # Check if the date exists in the data (convert row names to Date format)
+  row_dates <- as.Date(rownames(stock_data[[symbol]]), origin = "1970-01-01")
+  
+  # Filter data until the specified date
+  if (date_x %in% row_dates) {
+    # Filter the stock data until date X (inclusive)
+    subset_data <- stock_data[[symbol]][row_dates <= date_x, ]
+    
+    # Extract the adjusted price column
+    adjusted_col <- paste0(symbol, ".Adjusted")
+    
+    # Ensure the adjusted price column exists
+    if (adjusted_col %in% colnames(subset_data)) {
+      
+      # Create a time series object from the filtered data
+      ts_data <- ts(subset_data[, adjusted_col], frequency = 252)  # Assuming daily data, with 252 trading days in a year
+      
+      # Fit ARIMA model
+      arima_model <- auto.arima(ts_data)
+      
+      # Forecast future prices (for the next `periods` days after date X)
+      forecast_result <- forecast(arima_model, h = periods)  # Forecast for the next 90 days (extended)
+      
+      # Generate forecast dates starting from date X
+      forecast_dates <- seq(from = date_x, by = "days", length.out = periods + 1)[-1]  # Removing the date X itself
+
+      # Plot the historical data (up to the event date)
+      plot(as.Date(rownames(subset_data)), subset_data[, adjusted_col], type = "l", col = "black", 
+           xlab = "Date", ylab = "Price", main = paste("ARIMA Forecast from Date:", date_x), 
+           lwd = 1)  # Make historical line thinner
+
+      # Add the ARIMA forecast to the plot
+      lines(forecast_dates, forecast_result$mean, col = "blue", lwd = 2)  # Make forecast line bold
+      
+      # Shaded confidence intervals
+      polygon(c(forecast_dates, rev(forecast_dates)), 
+              c(forecast_result$lower[, 2], rev(forecast_result$upper[, 2])), 
+              col = rgb(1, 0, 0, 0.1), border = NA)  # Shaded red area between confidence intervals (light)
+      
+    } else {
+      cat("Adjusted price column not found for:", symbol, "\n")
+    }
+  } else {
+    cat("Date", date_x, "not found in the data.\n")
+  }
+}
+
+# Set up a 2x4 grid of plots
+par(mfrow = c(2, 4), mar = c(4, 4, 3, 1))  # Adjust margins if needed for better readability
+
+# Plot ARIMA forecasts for each of the given dates with more days and shaded confidence intervals
+dates <- c("2022-02-24", "2022-03-01", "2022-03-04", "2022-06-16", 
+           "2022-07-26", "2023-03-13", "2023-03-15", "2024-08-02")
+
+# Loop through each date and plot
+for (date in dates) {
+  plot_arima_until_date(smi_with_events, "UBSG.SW", date)
+}
+
+
+```
+
+#### **Interpretation**
+
+**Best Buy Opportunities**:
+
+- **2023-03-13** and **2023-03-15**: Strong upward movement with low uncertainty—ideal buying moments.
+
+- **2024-08-02**: Consistent growth, forecast supports continued upward movement.
+
+
+**Caution Needed**:
+
+- **2022-03-01** and **2022-03-04**: Slow, flat growth with no strong upward trend—avoid buying.
+
+- **2022-02-24** and **2022-06-16**: Periods of decline or flat movement, with little recovery expected soon.
+
+
+**Moderate Buy**:
+
+- **2022-07-26**: Consistent growth, a reasonable option but less promising than later opportunities.
+
+
+### **Buy Decision Based on ARIMA Forecast**
+
+Now, we implement a strategy where a stock is purchased based on ARIMA forecasts. If the forecast predicts an increase in the stock price beyond a certain threshold, the buy decision is marked as TRUE.
+
+<details>
+
+<summary>*Click to see ARIMA fit and evaluation functions*</summary>
+
+```{r fit_arima, class.source = "fold-show"}
+# Function to fit ARIMA model and make predictions
+fit_arima_predict <- function(stock_data, symbol, periods = 30) {
+  if (!is.null(stock_data[[symbol]])) {
+    stock <- stock_data[[symbol]]
+    adjusted_col <- paste0(symbol, ".Adjusted")
+    
+    # Check if the adjusted price column exists
+    if (adjusted_col %in% colnames(stock)) {
+      # Create a time series object
+      ts_data <- ts(stock[, adjusted_col], frequency = 252)  # Assuming daily data (252 trading days)
+      
+      # Fit ARIMA model
+      arima_model <- auto.arima(ts_data)
+      
+      # Forecast future prices (for the next `periods` days)
+      forecast_result <- forecast(arima_model, h = periods)
+      
+      return(forecast_result)
+    } else {
+      cat("Adjusted price column not found for:", symbol, "\n")
+      return(NULL)
+    }
+  } else {
+    cat("No data available for:", symbol, "\n")
+    return(NULL)
+  }
+}
+
+# Function to evaluate ARIMA forecast and decide whether to buy
+evaluate_arima_buy <- function(forecast_result, threshold = 0.6) {
+  if (!is.null(forecast_result)) {
+    # Check if the predicted price for the next day shows an increase (compared to the last observed price)
+    forecast_values <- forecast_result$mean
+    current_price <- tail(forecast_result$x, 1)  # Last observed price
+    forecast_increase <- (forecast_values[1] - current_price) / current_price  # Percentage change for the next day
+    
+    # If the predicted increase is above the threshold, we set Buy_Decision to TRUE
+    if (forecast_increase >= threshold) {
+      return(TRUE)
+    }
+  }
+  
+  return(FALSE)
+}
+```
+
+</details>
+
+<br>
+
+
+### **Adding Buy Decision Column - ARIMA**
+
+We apply the ARIMA-based buy decision strategy to the dataset by adding a new column, Buy_Decision, which is set to TRUE if the ARIMA forecast indicates a buy opportunity.
+
+<details>
+
+<summary>*Click to see buy decisions*</summary>
+
+```{r add_buy_decision_arima, echo= FALSE, class.source = "fold-show"}
+# Ensure this section is logically complete
+
+# Add ARIMA-based Buy Decision
+add_buy_decision_arima <- function(stock_data, symbol, threshold = 0.001) {
+    cat("Processing symbol:", symbol, "\n")
+    
+    if (!is.null(stock_data[[symbol]])) {
+        arima_forecast <- fit_arima_predict(stock_data, symbol)
+        if (!is.null(arima_forecast)) {
+            buy_decision <- evaluate_arima_buy(arima_forecast, threshold)
+            stock_data[[symbol]] <- as.data.frame(stock_data[[symbol]])
+            stock_data[[symbol]]$Buy_Decision <- ifelse(
+                stock_data[[symbol]]$Event == TRUE & buy_decision == TRUE,
+                TRUE,
+                FALSE
+            )
+        } else {
+            cat("ARIMA forecast not available for:", symbol, "\n")
+            stock_data[[symbol]]$Buy_Decision <- FALSE
+        }
+        return(stock_data[[symbol]])
+    } else {
+        cat("Data is NULL for:", symbol, "\n")
+        return(NULL)
+    }
+}
+
+# Initialize smi_with_buy_decision_arima
+smi_with_buy_decision_arima <- list()
+for (symbol in smi_symbols) {
+    smi_with_buy_decision_arima[[symbol]] <- add_buy_decision_arima(smi_with_events, symbol)
+}
+```
+
+</details>
+
+<br>
+
+### **Adding Buy Dates - ARIMA**
+
+Therefore we implement the ARIMA-based buy decision strategy by adding a new column, Buy_Decision, which is marked as TRUE if the ARIMA forecast indicates a buy opportunity.
+
+
+
+<details>
+
+<summary>*Click to see buy dates*</summary>
+
+```{r add_buy_dates_arima, echo= FALSE, class.source = "fold-show"}
+# Add Buy Dates to smi_with_buy_decision_arima
+add_buy_dates <- function(stock_data, symbol) {
+    if (!is.null(stock_data[[symbol]])) {
+        stock_data[[symbol]] <- as.data.frame(stock_data[[symbol]])
+        if (!"Buy_Decision" %in% colnames(stock_data[[symbol]])) {
+            cat("Buy_Decision column missing for:", symbol, "\n")
+            return(NULL)
+        }
+        stock_data[[symbol]]$Event_Date <- as.Date(row.names(stock_data[[symbol]]))
+        stock_data[[symbol]]$Buy_Date <- as.Date(NA)
+        for (i in which(stock_data[[symbol]]$Buy_Decision)) {
+            current_index <- i
+            future_index <- current_index + 3
+            if (future_index <= nrow(stock_data[[symbol]])) {
+                stock_data[[symbol]]$Buy_Date[current_index] <- stock_data[[symbol]]$Event_Date[future_index]
+            }
+        }
+        return(stock_data[[symbol]])
+    } else {
+        cat("No data available for:", symbol, "\n")
+        return(NULL)
+    }
+}
+
+# Initialize smi_with_buy_dates_arima
+smi_with_buy_dates_arima <- list()
+for (symbol in smi_symbols) {
+    smi_with_buy_dates_arima[[symbol]] <- add_buy_dates(stock_data = smi_with_buy_decision_arima, symbol = symbol)
+}
+
+# Print the smi_with_buy_dates_arima object to verify
+print(smi_with_buy_dates_arima)
+
+# Example: Display the first few rows for UBSG.SW
+head(smi_with_buy_dates_arima[["UBSG.SW"]][, c("Event_Date", "Buy_Date", "Buy_Decision")],100)
+```
+
+</details>
+
+<br>
+
+### **Holding the Stock for 30 Days & Calculate Returns - ARIMA**
+
+As in the previous approach, after purchasing the stock, it is held for 30 trading days to allow for potential recovery from any initial market overreaction.
+
+<details>
+
+<summary>*Click to see holding period*</summary>
+
+```{r holding_period_2,echo = FALSE, class.source = "fold-show"}
+# Function to calculate the returns for each stock
+calculate_returns <- function(stock_data, symbol) {
+  if (!is.null(stock_data[[symbol]])) {
+    stock_data[[symbol]] <- as.data.frame(stock_data[[symbol]])
+    adjusted_col <- paste0(symbol, ".Adjusted")  # Adjusted closing price
+
+    if (adjusted_col %in% colnames(stock_data[[symbol]])) {
+      # Calculate returns based on Buy_Date and Sell_Date (30 days later)
+      stock_data[[symbol]]$Return <- ifelse(
+        !is.na(stock_data[[symbol]]$Buy_Date),  # If a Buy Date exists
+        {
+          # Buy price (adjusted close price on Buy_Date)
+          buy_price <- lag(stock_data[[symbol]][, adjusted_col], 3)
+          # Sell price (adjusted close price 30 days after Buy_Date)
+          sell_price <- lead(stock_data[[symbol]][, adjusted_col], 30)
+          # Return calculation
+          (sell_price - buy_price) / buy_price
+        },
+        NA  # No return if no Buy Date is available
+      )
+      return(stock_data[[symbol]])
+    } else {
+      cat("Adjusted price column not found for:", symbol, "\n")
+      return(NULL)
+    }
+  } else {
+    cat("No data available for:", symbol, "\n")
+    return(NULL)
+  }
+}
+
+# Apply return calculation to all stocks
+smi_with_returns_arima <- list()
+
+for (i in seq_along(smi_with_buy_dates_arima)) {
+  symbol <- smi_symbols[i]
+  smi_with_returns_arima[[symbol]] <- calculate_returns(stock_data = smi_with_buy_dates_arima, symbol = symbol)
+}
+
+# Display the first 1000 rows of the results for UBSG.SW
+head(smi_with_returns_arima[["UBSG.SW"]], 100)
+```
+
+</details>
 
 ---
 
-### **Conclusion**
-The severe underperformance of the trading strategy highlights the need for substantial refinements in its design or execution. Meanwhile, the **Buy-and-Hold benchmark** demonstrates that a passive investment strategy in SMI stocks outperformed the active approach. Revising the strategy’s logic and risk management is essential for improving its overall performance.
+### ** Calculate Summary of the Results**
+
+The performance of the strategy is quantified using several key metrics:
+
+- **Average Return**: The average return across all transactions.
+- **Median Return**: The median return, which helps avoid distortion due to outliers.
+- **Positive vs. Negative Returns**: The proportion of positive returns relative to negative returns.
+- **Maximum and Minimum Return**: Identification of the maximum and minimum returns across the trades.
+- **Total Return**: The total return when applying the strategy to the entire portfolio.
+
+This time, with an **average return** of **-0.14** and a **total return** of **-0.85**, the performance has improved compared to before, but it still falls short of being satisfactory.
+
+<details>
+
+<summary>*Click to see arima results*</summary>
+
+```{r calculate_returns_arima, echo = FALSE, class.source = "fold-show"}
+# Function to summarize the results and extract returns
+summarize_results_arima <- function(stock_data) {
+  # Extract all returns from the list
+  returns_arima <- do.call(rbind, lapply(stock_data, function(df) {
+    if (!is.null(df$Return)) {
+      return(df$Return)
+    } else {
+      return(NULL)
+    }
+  }))
+  
+  # Remove NA values
+  returns_arima <- returns_arima[!is.na(returns_arima)]
+  
+  # Calculate metrics
+  summary_arima <- list(
+    average_return = mean(returns_arima),  # Average return
+    median_return = median(returns_arima),  # Median return
+    positive_ratio = sum(returns_arima > 0) / length(returns_arima),  # Proportion of positive returns_arima
+    max_return = max(returns_arima),  # Maximum return
+    min_return = min(returns_arima),  # Minimum return
+    total_return = sum(returns_arima)  # Total return
+  )
+  
+  # Store returns_arima globally if needed
+  assign("returns_arima", returns_arima, envir = .GlobalEnv)
+  
+  return(summary_arima)
+}
+
+# Summarize results for SMI and make returns_arima globally available
+results_summary_arima <- summarize_results_arima(smi_with_returns_arima)
+
+# Print the results
+print(results_summary_arima)
+```
+
+</details>
+
+<br>
+
+
+#### **Comparing Trading Strategy with Buy-and-Hold and ARIMA**
+
+We now compare the performance of the trading strategy with a Buy-and-Hold benchmark and an ARIMA-based strategy.
+
+<details>
+
+<summary>*Click to see results*</summary>
+
+```{r benchamark_arima, echo = FALSE, class.source = "fold-show"}
+# Average return of the Buy-and-Hold benchmark (already calculated)
+average_benchmark_return <- benchmark_results$average_return
+cat("Average Benchmark (Buy-and-Hold) Return:", average_benchmark_return * 100, "%\n")
+
+# Average return of the trading strategy
+average_strategy_return <- mean(returns, na.rm = TRUE)  # Calculate average return
+cat("Average Trading Strategy Return:", average_strategy_return * 100, "%\n")
+
+# Cumulative return of the trading strategy
+cumulative_strategy_return <- prod(1 + returns, na.rm = TRUE) - 1  # Convert to percentage
+cat("Cumulative Trading Strategy Return:", cumulative_strategy_return * 100, "%\n")
+
+# Calculate the average return for the ARIMA strategy
+average_arima_return <- mean(returns_arima, na.rm = TRUE)  # Calculate average return
+cat("Average ARIMA Strategy Return:", average_arima_return * 100, "%\n")
+
+# Calculate the cumulative return for the ARIMA strategy
+# Assuming the ARIMA returns are stored in a variable `arima_returns`
+cumulative_arima_return <- prod(1 + returns_arima, na.rm = TRUE) - 1  # Convert to percentage
+cat("Cumulative ARIMA Strategy Return:", cumulative_arima_return * 100, "%\n")
+
+```
+
+</details>
+
+<br>
+
+```{r comparing_trading_strategies, echo = FALSE, fig.width=10}
+# Reorder the factors for the correct order in the plot
+comparison_data <- data.frame(
+  Strategy = c("SMI", "Trading Strategy", "ARIMA Strategy"),
+  Return = c(average_benchmark_return, average_strategy_return, average_arima_return)
+)
+
+# Convert 'Strategy' column to a factor with specific levels to control the order
+comparison_data$Strategy <- factor(comparison_data$Strategy, levels = c("SMI", "Trading Strategy", "ARIMA Strategy"))
+
+# Bar plot to compare the returns with the specified color scheme
+ggplot(comparison_data, aes(x = Strategy, y = Return, fill = Strategy)) +
+  geom_bar(stat = "identity", color = "black", alpha = 0.7) +
+  labs(title = "Comparison of SMI vs Trading Strategy vs ARIMA Strategy",
+       x = "Strategy", y = "Return") +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = c("green", "orange", "red")) +  # Green for SMI, Red for Trading and ARIMA Strategy
+  theme_minimal() +
+  theme(legend.position = "none")  # Hide the legend
+
+```
+
+
+---
+
+## **Conclusion**
+
+In this project, we attempted to apply **Barney Stinson's 3-Day Rule** to stock trading, believing that a short waiting period could help refine decision-making and reduce emotional biases. The **Buy-and-Hold strategy** for **SMI** (Swiss Market Index) performed well, yielding a positive return of **6.93%**, which suggests that a long-term investment approach without frequent adjustments can provide steady growth, much like a stable, ongoing investment that doesn't require constant monitoring.
+
+However, the performance of both the **Trading Strategy** and **ARIMA Strategy** was less favorable:
+- The **Trading Strategy** resulted in an average return of **-5.87%**, with a cumulative return of **-99.99%**, indicating significant losses during the period.
+- The **ARIMA Strategy** showed slightly better results with an average return of **-14.23%** and a cumulative return of **-62.48%**, but it still underperformed relative to the **SMI Benchmark**.
+
+### **Key Insights:**
+1. The **SMI (Buy-and-Hold)** strategy outperformed both active strategies, suggesting that in certain market conditions, a passive investment strategy may be more effective than attempting to time the market.
+2. Both the **Trading Strategy** and **ARIMA Strategy** produced negative returns, with the Trading Strategy performing significantly worse. This highlights that short-term, reactive strategies may not capture the underlying market trends effectively.
+3. The **ARIMA model**, while a sophisticated forecasting tool, did not provide the accuracy needed to generate consistent profits. This reinforces the notion that stock price forecasting is inherently uncertain, and simpler rules may sometimes outperform complex models.
+4. Both strategies require further refinement. The current approaches, which are based on fixed thresholds and short-term reactive decisions, may benefit from a more dynamic, data-driven approach.
+
+### **Next Steps:**
+- **Refinement of Active Strategies**: Both **Trading** and **ARIMA strategies** need optimization, including adjusting entry/exit points, time horizons, and thresholds for better market responsiveness.
+- **Risk Management**: Incorporating tools like **stop-loss orders** can help mitigate losses during market volatility, preserving capital.
+- **Exploration of Alternative Models**: Using advanced techniques like **Random Forests**, **Gradient Boosting**, or **LSTM** could enhance predictive accuracy by identifying complex data patterns that simpler models might miss.
+
+In conclusion, while **Barney's 3-Day Rule** might be useful in some contexts, our analysis suggests that **a more thoughtful, data-driven approach** may be needed in the realm of stock trading. Long-term strategies with better risk management could provide more stable returns, while the active strategies would benefit from a more refined and evidence-based approach.
+
+As with life, not every investment is a quick win. **Maybe a stock, like a person, isn’t something to hold onto for just a month.** Some things, and people, are meant to become part of our lives and families, requiring more time and patience. So, while **Barney’s 3-Day Rule** might work for quick decisions, perhaps, for stocks (and relationships), we should consider a longer-term commitment.
+
+Let’s keep refining the strategy, try out different models, and who knows? Maybe next time we’ll make better choices, both with stocks and in life.
 
 ---
 
 ## **GenAI Usage**
 
 In developing and evaluating the trading strategy, **Generative AI (GenAI)** can be instrumental in improving the design and backtesting process. By leveraging AI models, we can automate the identification of optimal entry and exit points, conduct more accurate sentiment analysis, and even simulate different market scenarios to test the strategy's robustness. GenAI tools can also be used to enhance the event identification logic, optimize the holding periods, and suggest dynamic adjustments to risk management parameters. Furthermore, the integration of natural language processing (NLP) models can aid in analyzing market news and investor sentiment, providing additional insights to refine strategy decisions and predict market trends. With these advanced AI techniques, the strategy’s performance could be significantly improved, offering more consistent returns and better risk control.
+
